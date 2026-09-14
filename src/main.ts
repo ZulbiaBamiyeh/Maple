@@ -15,6 +15,8 @@ import { LedgerPanel } from './ui/ledger';
 import { TradeWindow } from './ui/trade';
 import { el, mesos } from './ui/dom';
 import { DummyWindow } from './ui/dummy';
+import { Arena } from './ui/arena';
+import { WagerWindow } from './ui/wager';
 
 async function boot() {
   await loadAssets();
@@ -50,13 +52,26 @@ async function boot() {
   const shop = new ShopPanel(run, () => refresh());
   const dummy = new DummyWindow(run);
   const ledger = new LedgerPanel(run, () => startDay());
+  const arena = new Arena();
+  const wager = new WagerWindow(
+    run, arena,
+    () => inventory.open(),
+    () => refresh(),
+    () => { scene.frozen = anyOpen(); syncFloor(); refresh(); },
+  );
+
   const trade = new TradeWindow(run, () => refresh(), () => {
     scene.frozen = false;
     syncFloor();
     refresh();
   });
 
-  for (const win of [inventory.win, shop.win, dummy.win, ledger.win, trade.win, trade.bagWin]) {
+  trade.onChallenge = (h) => {
+    wager.open(h.name, h.look, h.trueValue, run.rng.derive(`wager${run.day}:${h.name}`));
+    scene.frozen = true;
+  };
+
+  for (const win of [inventory.win, shop.win, dummy.win, ledger.win, trade.win, trade.bagWin, wager.win]) {
     win.onClose = chain(win.onClose, () => { scene.frozen = anyOpen(); });
   }
 
@@ -65,7 +80,8 @@ async function boot() {
   }
 
   function anyOpen(): boolean {
-    return [inventory.win, shop.win, dummy.win, ledger.win, trade.win].some((w) => w.isOpen);
+    return [inventory.win, shop.win, dummy.win, ledger.win, trade.win, wager.win].some((w) => w.isOpen)
+      || arena.isOpen;
   }
 
   /** The floor advertises itself: `S> Ilbi Throwing Stars @@@@`, `B> any glove @@@`. §5 */
@@ -195,8 +211,17 @@ async function boot() {
   if (import.meta.env.DEV) {
     // A handle for the screenshot harness. Development only.
     (window as unknown as Record<string, unknown>).__lr = {
-      run, scene, trade, shop, inventory, dummy, ledger,
+      run, scene, trade, shop, inventory, dummy, ledger, wager, arena,
       haggle: (i: number) => trade.open(run.hawkers[i], run.rng.derive('dev' + i)),
+      challenge: (i: number) => {
+        const h = run.hawkers[i];
+        wager.open(h.name, h.look, h.trueValue, run.rng.derive('devw' + i));
+      },
+      fight: () => arena.open(
+        { name: 'you', look: run.looks[0], gear: run.gear, record: '0W 0L' },
+        { name: 'T3hPwnerer', look: run.hawkers[1].look, gear: { weapon: 7, cape: 24, ring: 27, helm: 10, body: 13 }, record: '4W 2L' },
+        run.rng.derive('devfight'),
+      ),
     };
   }
 
@@ -208,6 +233,8 @@ async function boot() {
     scene.update(dtMs / 1000);
     scene.draw();
     trade.step(dtMs);
+    wager.step(dtMs / 1000);
+    arena.step(Math.min(0.05, dtMs / 1000));
     dummy.step(dtMs / 1000, scene);
     requestAnimationFrame(frame);
   }

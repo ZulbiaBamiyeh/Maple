@@ -114,6 +114,8 @@ canvas { image-rendering: pixelated; }
 
 /* --------------------------------------------------------------- item grids */
 
+.panel > .grid { margin: 0 auto; width: max-content; }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 36px);
@@ -409,3 +411,82 @@ canvas { image-rendering: pixelated; }
 .ledger .row.worst .worth { color: #a33; }
 .ledger .head { font: 12px/20px var(--pixel); letter-spacing: 1px; display: flex; justify-content: space-between; }
 .ledger .sum { margin-top: 6px; font: 10px/16px var(--pixel); color: #4a4740; }
+
+/* ------------------------------------------------------------------- arena */
+
+#arena {
+  position: absolute; inset: 0;
+  display: none;
+  z-index: 70;
+}
+#arena.on { display: block; }
+#arena canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.arena-ui { position: absolute; inset: 0; pointer-events: none; }
+
+.arena-bar {
+  position: absolute; top: 24px; width: 268px;
+  pointer-events: none;
+}
+.arena-bar.left { left: 26px; }
+.arena-bar.right { right: 26px; text-align: right; }
+.arena-name { font: 12px/18px var(--pixel); letter-spacing: 1px; color: var(--ink); text-shadow: 0 2px 0 #000; }
+.arena-track {
+  height: 13px;
+  background: #1b1a22;
+  border: 1px solid #0b0d12;
+  box-shadow: inset 0 1px 0 #ffffff22, 0 2px 6px rgba(0,0,0,0.5);
+}
+.arena-bar.right .arena-track { display: flex; justify-content: flex-end; }
+.arena-fill { height: 100%; transition: width 120ms linear; }
+.arena-status { font: 10px/16px var(--pixel); color: var(--gold); letter-spacing: 0.6px; text-shadow: 0 1px 0 #000; }
+
+.arena-slots {
+  position: absolute; top: 92px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.arena-slots.left { left: 26px; }
+.arena-slots.right { right: 26px; }
+.arena-slot {
+  --flash: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(12, 14, 20, calc(0.6 - var(--flash) * 0.3));
+  border: 1px solid rgba(255, 216, 102, calc(0.22 + var(--flash) * 0.78));
+  border-radius: 3px;
+  box-shadow: 0 0 calc(var(--flash) * 18px) rgba(255, 200, 90, var(--flash));
+  transform: scale(calc(1 + var(--flash) * 0.16));
+}
+.arena-slot img { image-rendering: pixelated; width: 26px; height: 26px; object-fit: contain; }
+
+.arena-foot {
+  position: absolute; left: 0; right: 0; bottom: 34px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  pointer-events: none;
+}
+.arena-foot .notice { font-size: 15px; }
+.arena-foot .btn { pointer-events: auto; width: 132px; flex: none; background: linear-gradient(180deg, #d08a3a, #8a5210); }
+
+/* ------------------------------------------------------------------ wagers */
+
+.stake-row { display: flex; gap: 10px; }
+.stake-col { flex: 1; }
+.stake-col h4 { margin: 0 0 4px; font: 10px/14px var(--pixel); letter-spacing: 0.8px; color: #26241e; }
+.odds {
+  text-align: center;
+  font: 13px/20px var(--pixel);
+  letter-spacing: 1px;
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000;
+  padding: 4px 0;
+}
+.hidden-purse {
+  font: 10px/14px var(--pixel);
+  color: #6f6b5c;
+  text-align: center;
+}
+.regear {
+  font: 16px/22px var(--pixel);
+  letter-spacing: 2px;
+  color: var(--ink);
+  text-align: center;
+}

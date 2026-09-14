@@ -76,12 +76,28 @@ function tierValueFor(run: Run, rng: Rng): number {
 export function spawnHawkers(run: Run, rng: Rng): Hawker[] {
   const looks = makeDistinctAppearances(rng, run.wardrobe, 4);
   const names = rng.sample([...Array(78).keys()].map(nameFor), 4);
-  return looks.map((look, i) => makeHawker(rng, {
-    name: names[i],
-    look,
-    tierValue: tierValueFor(run, rng),
-    reputation: run.reputation,
-  }));
+  const out: Hawker[] = [];
+  const taken = new Set<string>();
+  for (let i = 0; i < looks.length; i++) {
+    let h: Hawker | null = null;
+    // Four people on the floor all shouting about work gloves reads as a bug,
+    // so a pitch is only allowed to appear once.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = makeHawker(rng, {
+        name: names[i],
+        look: looks[i],
+        tierValue: tierValueFor(run, rng),
+        reputation: run.reputation,
+      });
+      const key = candidate.buyer ? `b:${candidate.wantSlot}` : `s:${candidate.give.id}`;
+      if (taken.has(key) && attempt < 7) continue;
+      taken.add(key);
+      h = candidate;
+      break;
+    }
+    if (h) out.push(h);
+  }
+  return out;
 }
 
 export function newRun(seed: string, wardrobe: Wardrobe): Run {

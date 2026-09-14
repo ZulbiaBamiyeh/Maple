@@ -34,6 +34,8 @@ const PALETTE: Record<NumberKind, { top: string; bottom: string; outline: string
 };
 
 export class Fx {
+  /** The arena draws the same effects twice the size of the market floor. */
+  scale = 1;
   private numbers: FloatingNumber[] = [];
   private particles: Particle[] = [];
   /** Frozen frames on impact — the cheapest impact trick there is. */
@@ -75,9 +77,9 @@ export class Fx {
         x: x + (Math.random() - 0.5) * (10 + stacks),
         y: y - Math.random() * 6,
         vx: (Math.random() - 0.5) * 22,
-        vy: -46 - Math.random() * 60 - stacks * 1.4,
+        vy: (-46 - Math.random() * 60 - stacks * 1.4) * this.scale,
         life: 0, max: 0.38 + Math.random() * 0.4,
-        kind: 'flame', colour: '', size: 2 + Math.random() * 2.6,
+        kind: 'flame', colour: '', size: (2 + Math.random() * 2.6) * this.scale,
       });
     }
   }
@@ -133,24 +135,26 @@ export class Fx {
     ctx.textBaseline = 'alphabetic';
     for (const n of this.numbers) {
       const pal = PALETTE[n.kind];
-      const width = pal.size * 0.62;
+      const size = pal.size * this.scale;
+      const width = size * 0.62;
       const total = n.glyphs.length * width;
       n.glyphs.forEach((g, i) => {
         const t = Math.max(0, n.t - g.delay);
         if (t <= 0) return;
         const k = Math.min(1, t / n.life);
         // up on an ease-out, hang, drift down, fade
-        const rise = k < 0.36 ? 34 * (1 - (1 - k / 0.36) ** 3) : 34 - (k - 0.36) * 16;
+        const climb = 34 * this.scale;
+        const rise = k < 0.36 ? climb * (1 - (1 - k / 0.36) ** 3) : climb - (k - 0.36) * 16 * this.scale;
         const alpha = k < 0.72 ? 1 : 1 - (k - 0.72) / 0.28;
         const gx = n.x - total / 2 + i * width + width / 2;
         const gy = n.y - rise;
         ctx.globalAlpha = Math.max(0, alpha);
-        ctx.font = `${pal.size}px Silkscreen, monospace`;
+        ctx.font = `${size}px Silkscreen, monospace`;
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 4 * this.scale;
         ctx.strokeStyle = pal.outline;
         ctx.strokeText(g.ch, gx, gy);
-        const grad = ctx.createLinearGradient(0, gy - pal.size, 0, gy + 2);
+        const grad = ctx.createLinearGradient(0, gy - size, 0, gy + 2);
         grad.addColorStop(0, pal.top);
         grad.addColorStop(1, pal.bottom);
         ctx.fillStyle = grad;

@@ -65,6 +65,9 @@ export class TradeWindow {
   private settled: number | null = null;
   private closing = false;
 
+  /** Set by the shell; the wager window is opened with this hawker. §10 */
+  onChallenge?: (h: Hawker) => void;
+
   constructor(private run: Run, private onChange: () => void, private onClosed: () => void) {
     this.win = makeWindow('Trade', { x: 170, y: 70, width: 386 });
 
@@ -87,6 +90,7 @@ export class TradeWindow {
       ['too much', () => this.say('too much')],
       ['u offer first', () => this.say('u offer')],
       ['inspect', () => this.say('inspect')],
+      ['fight me', () => this.challenge()],
     ] as [string, () => void][]) {
       const b = el('button', 'btn small', label);
       b.addEventListener('click', fn);
@@ -124,6 +128,22 @@ export class TradeWindow {
     mesoInput.addEventListener('keydown', (e) => e.stopPropagation());
     this.claimMenu.style.display = 'none';
     this.bagWin.body.append(bagPanel, mesoRow, this.claimMenu);
+  }
+
+  /** Combat is leveraged trading, so it starts from the same conversation. §10 */
+  private challenge() {
+    if (this.locked || this.h.gone) return;
+    if (this.run.foughtToday) {
+      this.system('you have already had your fight today.');
+      return;
+    }
+    this.write('you', 'fight me for it?', true);
+    const h = this.h;
+    this.closing = true;
+    this.win.close();
+    this.bagWin.close();
+    hideTip();
+    this.onChallenge?.(h);
   }
 
   // ------------------------------------------------------------------ opening
