@@ -9,6 +9,7 @@
 import { Rng, clamp } from './rng';
 import { ITEMS, item, itemsNearValue, type Item, type Slot } from './items';
 import type { Appearance } from './appearance';
+import type { Slot as GearSlot } from './items';
 
 export type Style = 'pricer' | 'offerer' | 'mixed';
 
@@ -21,6 +22,8 @@ export interface Give {
 export interface Hawker {
   name: string;
   look: Appearance;
+  /** What they are actually wearing, drawn from the same table. */
+  gear: Partial<Record<GearSlot, number>>;
   buyer: boolean;
   give: Give;
   wantSlot?: Slot;
@@ -81,6 +84,7 @@ export function savvyFor(rng: Rng, value: number): number {
 export interface HawkerSeed {
   name: string;
   look: Appearance;
+  gear: Partial<Record<GearSlot, number>>;
   /** Roughly what this trader is playing for. */
   tierValue: number;
   reputation: number;
@@ -110,6 +114,7 @@ export function makeHawker(rng: Rng, seed: HawkerSeed): Hawker {
   return {
     name: seed.name,
     look: seed.look,
+    gear: seed.gear,
     buyer,
     give: buyer
       ? { type: 'mesos', amt: roundMesos(trueValue * rng.float(0.9, 1.6)) }

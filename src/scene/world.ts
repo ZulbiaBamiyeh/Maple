@@ -34,8 +34,8 @@ export function targets(hawkerNames: string[], stallNames: string[]): Target[] {
   WORLD.stalls.forEach((x, i) => list.push({
     kind: 'stall', index: i, x, floor: 'upper', label: stallNames[i] ?? `FM ${i + 1}`,
   }));
-  list.push({ kind: 'dummy', index: 0, x: WORLD.dummyX, floor: 'upper', label: 'training dummy' });
-  list.push({ kind: 'door', index: 0, x: WORLD.doorX, floor: 'upper', label: 'home' });
+  list.push({ kind: 'dummy', index: 0, x: WORLD.dummyX, floor: 'upper', label: 'Training Dummy' });
+  list.push({ kind: 'door', index: 0, x: WORLD.doorX, floor: 'upper', label: 'HOME' });
   WORLD.hawkers.forEach((x, i) => list.push({
     kind: 'hawker', index: i, x, floor: 'lower', label: hawkerNames[i] ?? '',
   }));

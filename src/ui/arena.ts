@@ -174,14 +174,14 @@ export class Arena {
         this.dolls[attacker].swingFor = 0.34;
         this.dolls[attacker].frame = 0;
         this.dolls[e.side].flinch = 0.14;
-        this.fx.popNumber(e.amount, e.crit ? 'crit' : 'hit', xOf(e.side), feet - 176);
+        this.fx.popNumber(e.amount, e.crit ? 'crit' : 'hit', xOf(e.side), feet - 214);
         break;
       }
       case 'tick':
-        this.fx.popNumber(e.amount, 'burn', xOf(e.side) + 34, feet - 66);
+        this.fx.popNumber(e.amount, 'burn', xOf(e.side) + 40, feet - 52);
         break;
       case 'heal':
-        this.fx.popNumber(e.amount, 'heal', xOf(e.side) - 40, feet - 128);
+        this.fx.popNumber(e.amount, 'heal', xOf(e.side) - 46, feet - 246);
         break;
       case 'proc':
         // That slot lights up — how the player learns which item did the thing. §9.6
@@ -191,9 +191,8 @@ export class Arena {
         this.finished = true;
         this.yieldBtn.style.visibility = 'hidden';
         const yielded = e.reason === 'yield';
-        this.caption.textContent = e.winner === 0
-          ? (yielded ? 'they gave it up' : 'you win')
-          : (yielded ? 'you gave it up' : `${this.dolls[1].side.name} wins`);
+        this.caption.textContent = e.winner === 0 ? 'WIN' : 'LOSE';
+        void yielded;
         setTimeout(() => this.onDone?.(e.winner, yielded), 1500);
         break;
       }
@@ -288,8 +287,8 @@ export class Arena {
       );
       ctx.save();
       ctx.translate(x, feet);
-      ctx.scale(i === 0 ? scale : -scale, scale);
-      if (doll.flinch > 0) ctx.translate(i === 0 ? -1.5 : -1.5, 0);
+      ctx.scale(scale, scale);
+      if (doll.flinch > 0) ctx.translate(-1.5, 0);
       ctx.drawImage(r.canvas, -r.anchor.x, -r.anchor.y);
       ctx.restore();
 

@@ -54,13 +54,11 @@ export class WagerWindow {
     const left = el('div', 'side');
     left.append(this.portrait, this.nameplate);
     const right = el('div', 'side');
-    const stakeLabel = el('div', 'shop-head');
-    stakeLabel.innerHTML = '<b>YOU PUT UP</b>';
-    right.append(stakeLabel, this.stakeGrid);
+    right.append(this.stakeGrid);
     head.append(left, right);
 
     const purse = el('div', 'chatin');
-    this.mesoInput.placeholder = 'mesos (they cannot see these)';
+    this.mesoInput.placeholder = '';
     const setBtn = el('button', 'btn small', 'set');
     purse.append(this.mesoInput, setBtn);
     setBtn.addEventListener('click', () => this.setMesos());
@@ -70,9 +68,7 @@ export class WagerWindow {
     });
 
     const bagPanel = el('div', 'panel');
-    const bagLabel = el('div', 'shop-head');
-    bagLabel.innerHTML = '<b>YOUR ITEMS</b> — anything you stake, they can see';
-    bagPanel.append(bagLabel, this.bagGrid);
+    bagPanel.append(this.bagGrid);
 
     const buttons = el('div', 'btn-row');
     buttons.append(this.askBtn);
@@ -219,7 +215,7 @@ export class WagerWindow {
         const img = el('img');
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
-        bindTip(cell, () => ({ item: it, opts: { note: 'they can see this. you can lose it.' } }));
+        bindTip(cell, () => ({ item: it }));
         cell.addEventListener('click', () => {
           if (this.phase !== 'staking') return;
           this.mine.items.splice(i, 1);
@@ -245,7 +241,7 @@ export class WagerWindow {
         const img = el('img');
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
-        bindTip(cell, () => ({ item: it, opts: { note: 'stake it and they see it' } }));
+        bindTip(cell, () => ({ item: it }));
         cell.addEventListener('click', () => {
           if (this.phase !== 'staking') return;
           this.mine.items.push(id);

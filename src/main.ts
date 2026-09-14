@@ -14,7 +14,7 @@ import { ShopPanel } from './ui/shop';
 import { LedgerPanel } from './ui/ledger';
 import { TradeWindow } from './ui/trade';
 import { el, mesos } from './ui/dom';
-import { dressed, holding } from './ui/look';
+
 import { DummyWindow } from './ui/dummy';
 import { Arena } from './ui/arena';
 import { WagerWindow } from './ui/wager';
@@ -30,11 +30,11 @@ async function boot() {
   const seed = new URLSearchParams(location.search).get('seed') ?? String(Date.now());
   const run: Run = newRun(seed, wardrobe);
   const lookRng = new Rng(seed + ':player');
-  run.looks = [makeAppearance(lookRng, wardrobe, 1)];
+  run.looks = [makeAppearance(lookRng, wardrobe)];
   run.looks[0].sitting = false;
 
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
-  const scene = new Scene(canvas, dressed(run.looks[0], run.gear));
+  const scene = new Scene(canvas, run.looks[0], run.gear);
   scene.player.name = 'you';
   const hudDay = document.getElementById('hud-day')!;
   const hudMesos = document.getElementById('hud-mesos')!;
@@ -47,7 +47,7 @@ async function boot() {
     hudMesos.innerHTML = `<b>${mesos(run.mesos)}</b> MESOS`;
     hudRecord.textContent = `${run.wins}W ${run.losses}L`;
     // What you are wearing is what you look like, on the floor and in the window.
-    scene.player.look = dressed(run.looks[0], run.gear);
+    scene.player.gear = run.gear;
     inventory.render();
   };
 
@@ -109,15 +109,16 @@ async function boot() {
 
   function syncFloor() {
     const rng = run.rng.derive(`floor${run.day}`);
-    const keeperLooks = run.stalls.map((s) => s.look);
-    scene.stallKeepers = keeperLooks.map((look, i): Actor => ({
-      look: { ...look, sitting: true },
+    scene.stallKeepers = run.stalls.map((stall, i): Actor => ({
+      look: { ...stall.look, sitting: true },
+      gear: stall.gear,
       x: WORLD.stalls[i] + 46, floor: 'upper', facing: -1,
       pose: 'sit', frame: 0, frameTime: 0,
     }));
     scene.npcs = run.hawkers.map((h, i): Actor => ({
-      // A seller is visibly holding the thing they are selling. §4.4
-      look: h.give.type === 'item' ? holding(h.look, h.give.id) : h.look,
+      look: h.look,
+      // They wear their own gear, and a seller visibly holds what they are selling. §4.4
+      gear: h.give.type === 'item' ? { ...h.gear, [item(h.give.id!).slot]: h.give.id } : h.gear,
       x: WORLD.hawkers[i], floor: 'lower', facing: 1,
       pose: h.look.sitting ? 'sit' : 'stand1', frame: 0, frameTime: 0,
       bubble: h.gone ? undefined : bubbleFor(i),
@@ -128,9 +129,8 @@ async function boot() {
   }
 
   scene.onPrompt = (t: Target | null) => {
-    hudHint.textContent = t
-      ? `↑  ${t.kind === 'hawker' ? 'talk to ' + t.label : t.kind === 'door' ? 'go home (ends the day)' : t.label}`
-      : '↑ interact · ↓ ladder · I gear';
+    hudHint.textContent = t ? `↑  ${t.label}` : '';
+    hudHint.style.visibility = t ? 'visible' : 'hidden';
   };
 
   scene.onInteract = (t: Target) => {

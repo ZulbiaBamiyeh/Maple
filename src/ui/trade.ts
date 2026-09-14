@@ -9,16 +9,16 @@ import { getCharacterSprite, getItemIcon, type Expression } from '../assets/inde
 import { Rng } from '../core/rng';
 import { item, type Item } from '../core/items';
 import {
-  CLAIM_LABELS, CLAIM_MULTIPLIERS, hesitation, idleCheck, judgeClaim, judgeTrade,
+  CLAIM_MULTIPLIERS, hesitation, idleCheck, judgeClaim, judgeTrade,
   mesoWord, openingScript, parse, probe, respond, spendPatience, thinkDelay, typingTime,
-  valueToThem, pileValue, type Hawker, type Line, type Reaction, type TableItem,
+  pileValue, type Hawker, type Line, type Reaction, type TableItem,
 } from '../core/negotiate';
 import { adjustReputation, record, type Run } from '../core/game';
 import { logNegotiation } from '../core/log';
 import { clear, el, mesos, short, timestamp } from './dom';
 import { bindTip, hideTip } from './tooltip';
 import { makeWindow, setTitle, type Win } from './window';
-import { dressed, holding } from './look';
+import { dressed } from './look';
 
 interface Queued {
   line: Line;
@@ -81,7 +81,7 @@ export class TradeWindow {
     logPanel.append(this.log, this.typing);
 
     const row = el('div', 'chatin');
-    this.input.placeholder = 'say something…';
+    this.input.placeholder = '';
     this.input.maxLength = 80;
     const send = el('button', 'btn small', 'send');
     row.append(this.input, send);
@@ -117,7 +117,7 @@ export class TradeWindow {
     bagPanel.append(this.bagGrid);
     const mesoRow = el('div', 'chatin');
     const mesoInput = el('input');
-    mesoInput.placeholder = 'mesos…';
+    mesoInput.placeholder = '';
     const put = el('button', 'btn small', 'put up');
     mesoRow.append(mesoInput, put);
     put.addEventListener('click', () => {
@@ -180,7 +180,10 @@ export class TradeWindow {
   }
 
   private renderPortraits() {
-    const theirs = this.h.give.type === 'item' ? holding(this.h.look, this.h.give.id) : this.h.look;
+    const worn = this.h.give.type === 'item'
+      ? { ...this.h.gear, [item(this.h.give.id!).slot]: this.h.give.id }
+      : this.h.gear;
+    const theirs = dressed(this.h.look, worn);
     for (const [box, look, expr] of [
       [this.theirPortrait, theirs, this.expression()],
       [this.myPortrait, dressed(this.run.looks[0], this.run.gear), 'default' as Expression],
@@ -282,7 +285,6 @@ export class TradeWindow {
       case 'pull':
         this.h.placed = false;
         this.renderTable();
-        this.system('they take their things back.');
         break;
       case 'leave':
         this.finish('temper');
@@ -366,7 +368,7 @@ export class TradeWindow {
           );
         }
         // The player is never told what a thing is worth. §6.4
-        bindTip(cell, () => ({ item: it, opts: { hidePrice: true, note: 'theirs' } }));
+        bindTip(cell, () => ({ item: it, opts: { hidePrice: true } }));
       }
       this.theirGrid.append(cell);
     }
@@ -387,12 +389,7 @@ export class TradeWindow {
         const claimed = Math.round(it.price * entry.claim);
         const tag = el('div', 'tag' + (entry.claim > 1 ? ' lie' : ''), short(claimed));
         cell.append(tag);
-        bindTip(cell, () => ({
-          item: it,
-          opts: {
-            note: `you are calling it ${short(claimed)} · they'd value it at ${short(valueToThem(this.h, it))}`,
-          },
-        }));
+        bindTip(cell, () => ({ item: it, opts: { hidePrice: true } }));
         // Clicking the item takes it back; clicking the tag opens the claim menu.
         cell.addEventListener('click', (e) => {
           if (e.target === tag) return;
@@ -431,10 +428,7 @@ export class TradeWindow {
         const img = el('img');
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
-        bindTip(cell, () => ({
-          item: it,
-          opts: { note: `they'd value it at ${short(valueToThem(this.h, it))}` },
-        }));
+        bindTip(cell, () => ({ item: it }));
         cell.addEventListener('click', () => {
           if (this.locked) return;
           this.table.push({ itemId: id, claim: 1 });
@@ -456,10 +450,10 @@ export class TradeWindow {
     clear(this.claimMenu);
     this.claimMenu.style.display = 'block';
     const head = el('div', 'shop-head');
-    head.innerHTML = `<b>${it.name}</b> — really worth ${short(it.price)}. what do you tell them?`;
+    head.innerHTML = `<b>${it.name}</b>`;
     this.claimMenu.append(head);
-    CLAIM_MULTIPLIERS.forEach((mult, i) => {
-      const btn = el('button', 'btn small', `${CLAIM_LABELS[i]}   "${short(Math.round(it.price * mult))}"`);
+    CLAIM_MULTIPLIERS.forEach((mult) => {
+      const btn = el('button', 'btn small', short(Math.round(it.price * mult)));
       btn.style.textAlign = 'left';
       btn.style.textTransform = 'none';
       btn.addEventListener('click', () => {
@@ -480,7 +474,7 @@ export class TradeWindow {
   private pressTrade() {
     if (this.locked || this.h.gone) return;
     const total = pileValue(this.h, this.table, this.offerMesos);
-    if (!total) { this.system('put something up first.'); return; }
+    if (!total) return;
     this.locked = true;
     this.mySide.classList.add('locked');
     if (!this.mySide.querySelector('.tick')) {

@@ -1,8 +1,8 @@
 import { Rng, clamp } from './rng';
-import { ITEMS, type Item } from './items';
+import { ITEMS, type Item, type Slot } from './items';
 import { type BoardMessage, type BoardContext, seedBoard, addMessages } from './board';
 import type { Appearance, Wardrobe } from './appearance';
-import { makeAppearance } from './appearance';
+import { makeAppearance, makeLoadout } from './appearance';
 
 export interface StallStock {
   itemId: number;
@@ -14,9 +14,9 @@ export interface StallStock {
 export interface Stall {
   pitch: number;
   name: string;
-  blurb: string;
   owner: string;
   look: Appearance;
+  gear: Partial<Record<Slot, number>>;
   hue: number;
   daysLeft: number;
   stock: StallStock[];
@@ -31,20 +31,6 @@ const OWNERS = [
 const SHOP_NAMES = [
   "%s's Curios", "%s & Daughter", 'The %s Pitch', "%s's Odds", '%s Supply',
   "%s's Leftovers", 'Honest %s', "%s's Second Hand", '%s Trading Co.',
-];
-
-const BLURBS = [
-  'Things she swears are cursed. She\'s lying. Mostly.',
-  'Everything here fell off a cart. A legitimate cart.',
-  'Cheap because he wants to go home.',
-  'No refunds, no talking, no exceptions.',
-  'Stock rotates when someone dies in Sleepywood.',
-  'Priced to move. Some of it.',
-  'If you have to ask, you cannot afford the asking.',
-  'Bought a warehouse. Regretting it.',
-  'Clearing out a guild that fell apart.',
-  'Gear from people who quit. All of it.',
-  'Half of this is junk. Half of it is not.',
 ];
 
 function roundish(v: number): number {
@@ -85,8 +71,8 @@ export function makeStall(rng: Rng, w: Wardrobe, pitch: number, day: number, ban
     pitch,
     owner,
     name: rng.pick(SHOP_NAMES).replace('%s', rng.chance(0.5) ? owner : short),
-    blurb: rng.pick(BLURBS),
-    look: makeAppearance(rng, w, 2),
+    look: makeAppearance(rng, w),
+    gear: makeLoadout(rng, 2),
     hue: rng.int(0, 359),
     daysLeft: rng.int(1, 3),
     stock: makeStock(rng, bankroll),

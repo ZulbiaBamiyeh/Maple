@@ -1,8 +1,8 @@
 import { getCharacterSprite, getItemIcon } from '../assets/index';
 import { rollUp } from '../core/combat';
-import { item, SLOTS, SLOT_LABEL, type Slot } from '../core/items';
+import { item, SLOTS, type Slot } from '../core/items';
 import { equip, sellToStall, unequip, type Run } from '../core/game';
-import { clear, el, mesos, short } from './dom';
+import { clear, el, mesos } from './dom';
 import { bindTip, hideTip } from './tooltip';
 import { dressed } from './look';
 import { makeWindow, type Win } from './window';
@@ -92,14 +92,12 @@ export class InventoryPanel {
           : run.gear[slot];
         if (slot === 'ring') ringsUsed.push(1);
         const cell = el('div', 'slot' + (id !== undefined ? ' filled' : ''));
-        if (id === undefined) {
-          cell.append(el('div', 'lbl', SLOT_LABEL[slot].slice(0, 4).toUpperCase()));
-        } else {
+        if (id !== undefined) {
           const it = item(id);
           const img = el('img');
           img.src = getItemIcon(it.iconKey);
           cell.append(img);
-          bindTip(cell, () => ({ item: it, opts: { note: 'click to take off' } }));
+          bindTip(cell, () => ({ item: it }));
           cell.addEventListener('click', () => {
             unequip(run, slot);
             hideTip();
@@ -125,10 +123,7 @@ export class InventoryPanel {
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
         if (worn.has(id) && k === 0) cell.append(el('div', 'tag', 'WORN'));
-        bindTip(cell, () => ({
-          item: it,
-          opts: { note: `click to wear · right-click sells to a stall for ${short(Math.round(it.price * 0.5))}` },
-        }));
+        bindTip(cell, () => ({ item: it }));
         cell.addEventListener('click', () => { equip(run, it); this.render(); this.onChange(); });
         cell.addEventListener('contextmenu', (e) => {
           e.preventDefault();

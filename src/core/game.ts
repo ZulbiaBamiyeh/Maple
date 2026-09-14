@@ -2,7 +2,7 @@
 import { Rng, clamp } from './rng';
 import { ITEMS, item, type Item, type Slot } from './items';
 import type { Appearance, Wardrobe } from './appearance';
-import { makeDistinctAppearances } from './appearance';
+import { makeDistinctAppearances, makeLoadout, type WealthTier } from './appearance';
 import { makeHawker, type Hawker } from './negotiate';
 import { makeStall, overnight, type Stall, BUYBACK_RATE } from './stalls';
 import { nameFor } from './names';
@@ -83,10 +83,13 @@ export function spawnHawkers(run: Run, rng: Rng): Hawker[] {
     // Four people on the floor all shouting about work gloves reads as a bug,
     // so a pitch is only allowed to appear once.
     for (let attempt = 0; attempt < 8; attempt++) {
+      const tierValue = tierValueFor(run, rng);
+      const tier: WealthTier = tierValue >= 400_000 ? 3 : tierValue >= 90_000 ? 2 : tierValue >= 20_000 ? 1 : 0;
       const candidate = makeHawker(rng, {
         name: names[i],
         look: looks[i],
-        tierValue: tierValueFor(run, rng),
+        gear: makeLoadout(rng, tier),
+        tierValue,
         reputation: run.reputation,
       });
       const key = candidate.buyer ? `b:${candidate.wantSlot}` : `s:${candidate.give.id}`;

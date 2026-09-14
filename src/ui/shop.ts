@@ -29,7 +29,7 @@ export class ShopPanel {
     const label = el('div', 'shop-head');
     label.innerHTML = '<b>NOTICE BOARD</b>';
     const row = el('div', 'chatin');
-    this.input.placeholder = 'write on the board…';
+    this.input.placeholder = '';
     this.input.maxLength = 60;
     const post = el('button', 'btn small', 'post');
     row.append(this.input, post);
@@ -64,10 +64,9 @@ export class ShopPanel {
     this.head.innerHTML = '';
     const title = el('div');
     title.innerHTML = `<b>${s.name}</b>`;
-    const sub = el('div', 'sub', s.blurb);
     const days = s.daysLeft <= 1 ? 'last day here' : `here for ${s.daysLeft} more days`;
     const meta = el('div', 'meta', `${days} · ${s.stock.length - sold} for sale · ${sold} already sold`);
-    this.head.append(title, sub, meta);
+    this.head.append(title, meta);
 
     clear(this.stock);
     for (const entry of s.stock) {
@@ -82,9 +81,7 @@ export class ShopPanel {
         opts: {
           hidePrice: true,
           priceLabel: 'ASKING',
-          warn: entry.sold ? 'someone already bought this'
-            : afford ? undefined : `you are ${short(entry.ask - this.run.mesos)} short`,
-          note: entry.sold ? undefined : `asking ${short(entry.ask)}  ·  no haggling up here`,
+          warn: entry.sold ? 'SOLD' : afford ? undefined : 'NOT ENOUGH MESOS',
         },
       }));
       if (!entry.sold && afford) {

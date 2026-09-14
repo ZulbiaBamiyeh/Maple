@@ -2,8 +2,10 @@
  * The walking-around layer: camera, actors, click-to-walk with cross-floor
  * routing, and the chat bubbles overhead. §5
  */
-import { getCharacterSprite, frameCount, frameDelay, type Look, type Pose } from '../assets/index';
+import { getCharacterSprite, frameCount, frameDelay, type Pose } from '../assets/index';
 import type { Appearance } from '../core/appearance';
+import type { Slot } from '../core/items';
+import { dressed } from '../ui/look';
 import { paintBackdrop } from './backdrop';
 import { WORLD, floorY, nearest, type Floor, type Target } from './world';
 import { Fx } from './fx';
@@ -13,6 +15,8 @@ const CLIMB_SPEED = 116;
 
 export interface Actor {
   look: Appearance;
+  /** What they are wearing — the character on screen is the character's gear. */
+  gear: Partial<Record<Slot, number>>;
   x: number;
   floor: Floor;
   facing: 1 | -1;
@@ -22,10 +26,6 @@ export interface Actor {
   /** Shop chat, the way the floor wrote it: the message, then rows of @ to shove it up. */
   bubble?: string[];
   name?: string;
-}
-
-function toLook(a: Appearance): Look {
-  return a;
 }
 
 export class Scene {
@@ -50,12 +50,12 @@ export class Scene {
   onInteract?: (t: Target) => void;
   onPrompt?: (t: Target | null) => void;
 
-  constructor(canvas: HTMLCanvasElement, playerLook: Appearance) {
+  constructor(canvas: HTMLCanvasElement, playerLook: Appearance, playerGear: Partial<Record<Slot, number>>) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.backdrop = paintBackdrop();
     this.player = {
-      look: playerLook, x: 300, floor: 'lower', facing: 1,
+      look: playerLook, gear: playerGear, x: 300, floor: 'lower', facing: 1,
       pose: 'stand1', frame: 0, frameTime: 0,
     };
     this.bindInput();
@@ -202,7 +202,7 @@ export class Scene {
 
   private drawActor(ctx: CanvasRenderingContext2D, a: Actor, y: number) {
     const pose: Pose = a.look.sitting && a.pose === 'stand1' ? 'sit' : a.pose;
-    const r = getCharacterSprite(toLook(a.look), pose, a.frame);
+    const r = getCharacterSprite(dressed(a.look, a.gear), pose, a.frame);
     ctx.save();
     ctx.translate(a.x, y);
     if (a.facing === -1) ctx.scale(-1, 1);

@@ -28,8 +28,8 @@ replays a run exactly.
 | | |
 |---|---|
 | **The hall** | Two floors modelled on the Free Market Entrance — three numbered pitches and the training dummy above, four hawkers below. Click-to-walk routes via the ladder. |
-| **The crowd** | Procedural looks from a curated wardrobe: ~70% read as poor, appearance correlates with wealth and lies about it one time in five, and no two people on screen share a look. |
-| **Stalls** | A pitch, not a shop. An owner holds it for one to three days, prices at 0.78–1.50× true value, and that markup decides what sells overnight — so the shelves visibly pick themselves clean of value. |
+| **The crowd** | Faces, hair and skin are procedural; everything else a person is wearing comes from the same price table the player buys from, so a trader in a Sauna Robe really is carrying one. Most of the floor is poor, and appearance lies about it one time in five. |
+| **Stalls** | A pitch, not a shop. An owner holds it for one to three days, prices at 0.78–1.50x true value, and that markup decides what sells overnight — so the shelves visibly pick themselves clean of value. |
 | **Notice boards** | Price gossip at 72–127% of truth, wanted ads, warnings naming live hawkers, the shopkeeper's own notices, and noise. The only price history the game gives you. |
 | **Negotiation** | A trade window and a person on the other side of it. Everything they say goes through one queue with think and typing delays, hesitation and dedupe. Free chit-chat, costed actions, two hidden clocks, price tags you choose and can be caught on. |
 | **Combat** | Both fighters auto-attack on a timer; everything was decided in the market. Damage numbers bounce in per-digit, burn is fire, procs light up the slot that fired. |
