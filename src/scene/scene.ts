@@ -15,8 +15,11 @@ const CLIMB_SPEED = 116;
 
 export interface Actor {
   look: Appearance;
-  /** What they are wearing — the character on screen is the character's gear. */
-  gear: Partial<Record<Slot, number>>;
+  /**
+   * What they are wearing. Read fresh on every frame, so equipping something
+   * shows up on the character the moment it is equipped.
+   */
+  gear: Partial<Record<Slot, number>> | (() => Partial<Record<Slot, number>>);
   x: number;
   floor: Floor;
   facing: 1 | -1;
@@ -50,7 +53,11 @@ export class Scene {
   onInteract?: (t: Target) => void;
   onPrompt?: (t: Target | null) => void;
 
-  constructor(canvas: HTMLCanvasElement, playerLook: Appearance, playerGear: Partial<Record<Slot, number>>) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    playerLook: Appearance,
+    playerGear: () => Partial<Record<Slot, number>>,
+  ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.backdrop = paintBackdrop();
@@ -202,7 +209,8 @@ export class Scene {
 
   private drawActor(ctx: CanvasRenderingContext2D, a: Actor, y: number) {
     const pose: Pose = a.look.sitting && a.pose === 'stand1' ? 'sit' : a.pose;
-    const r = getCharacterSprite(dressed(a.look, a.gear), pose, a.frame);
+    const gear = typeof a.gear === 'function' ? a.gear() : a.gear;
+    const r = getCharacterSprite(dressed(a.look, gear), pose, a.frame);
     ctx.save();
     ctx.translate(a.x, y);
     if (a.facing === -1) ctx.scale(-1, 1);

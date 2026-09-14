@@ -34,7 +34,7 @@ async function boot() {
   run.looks[0].sitting = false;
 
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
-  const scene = new Scene(canvas, run.looks[0], run.gear);
+  const scene = new Scene(canvas, run.looks[0], () => run.gear);
   scene.player.name = 'you';
   const hudDay = document.getElementById('hud-day')!;
   const hudMesos = document.getElementById('hud-mesos')!;
@@ -46,8 +46,6 @@ async function boot() {
     hudDay.textContent = `DAY ${run.day} / ${DAYS}`;
     hudMesos.innerHTML = `<b>${mesos(run.mesos)}</b> MESOS`;
     hudRecord.textContent = `${run.wins}W ${run.losses}L`;
-    // What you are wearing is what you look like, on the floor and in the window.
-    scene.player.gear = run.gear;
     inventory.render();
   };
 
@@ -227,6 +225,12 @@ async function boot() {
     // A handle for the screenshot harness. Development only.
     (window as unknown as Record<string, unknown>).__lr = {
       run, scene, trade, shop, inventory, dummy, ledger, wager, arena,
+      // Mutates in place, the way equipping does — never swap the object out.
+      wear: (gear: Record<string, number>) => {
+        for (const k of Object.keys(run.gear)) delete (run.gear as Record<string, number>)[k];
+        Object.assign(run.gear, gear);
+        refresh();
+      },
       haggle: (i: number) => trade.open(run.hawkers[i], run.rng.derive('dev' + i)),
       challenge: (i: number) => {
         const h = run.hawkers[i];
