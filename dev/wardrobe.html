@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>wardrobe check</title>
+<style>
+  body { background: #2b2f3a; margin: 0; padding: 16px; font: 12px monospace; color: #ddd; }
+  canvas { image-rendering: pixelated; }
+  .row { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
+  .cell { text-align: center; }
+</style>
+<div id="out">loading…</div>
+<script type="module">
+  import { loadAssets, preloadSprites, getCharacterSprite, assets } from '../src/assets/index.ts';
+
+  const out = document.getElementById('out');
+  await loadAssets();
+  await preloadSprites();
+  const m = assets();
+  const pick = (g, i) => m.pool[g][i % m.pool[g].length];
+
+  function show(title, looks, pose, frame) {
+    const h = document.createElement('div');
+    h.textContent = title;
+    out.append(h);
+    const row = document.createElement('div');
+    row.className = 'row';
+    for (const look of looks) {
+      const r = getCharacterSprite(look, pose, frame);
+      const c = document.createElement('div');
+      c.className = 'cell';
+      const big = document.createElement('canvas');
+      big.width = r.canvas.width * 2;
+      big.height = r.canvas.height * 2;
+      const g = big.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.drawImage(r.canvas, 0, 0, big.width, big.height);
+      c.append(big);
+      row.append(c);
+    }
+    out.append(row);
+  }
+  out.textContent = '';
+
+  const base = { skin: '0', face: pick('face', 0), hair: pick('hair', 0) };
+  show('naked base, stand/walk/sit/alert', [base, base, base, base].map((b) => ({ ...b })), 'stand1', 0);
+
+  const dressed = [];
+  for (let i = 0; i < 8; i++) {
+    dressed.push({
+      skin: String(i % 5),
+      face: pick('face', i),
+      hair: pick('hair', i * 3),
+      cap: i % 3 ? pick('cap', i) : undefined,
+      coat: pick('coat', i),
+      pants: pick('pants', i),
+      shoes: pick('shoes', i),
+      glove: i % 2 ? pick('glove', i) : undefined,
+      cape: i % 4 === 0 ? pick('cape', i) : undefined,
+      weapon: i % 2 ? pick('weapon', i) : undefined,
+    });
+  }
+  show('dressed crowd', dressed, 'stand1', 0);
+  show('walk frames (one look)', [0, 1, 2, 3].map(() => dressed[1]), 'walk1', 0);
+  const d = dressed[1];
+  const row = document.createElement('div'); row.className = 'row'; out.append(row);
+  for (const [pose, frame] of [['walk1',0],['walk1',1],['walk1',2],['walk1',3],['sit',0],['alert',0],['swingO1',1],['ladder',0],['jump',0]]) {
+    const r = getCharacterSprite(d, pose, frame);
+    const big = document.createElement('canvas');
+    big.width = r.canvas.width * 2; big.height = r.canvas.height * 2;
+    const g = big.getContext('2d'); g.imageSmoothingEnabled = false;
+    g.drawImage(r.canvas, 0, 0, big.width, big.height);
+    row.append(big);
+  }
+  document.title = 'ready';
+</script>
