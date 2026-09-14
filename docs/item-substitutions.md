@@ -39,3 +39,39 @@ the v83 equip table; the rest borrow an era-appropriate piece in the same slot.
 
 Mechanics in `data/items.json` are ours throughout; only names and art are
 borrowed.
+
+## What each item looks like when worn
+
+The extracted layer set available to the build is cash cosmetics — there are no
+real swords or capes in it — so each item's *worn* appearance is a stand-in
+chosen for silhouette. Equipping something visibly changes the character on the
+floor, in the equipment window and in the arena, and a hawker selling a Maple
+Sword is visibly holding one, which is what §4.4 asks the wardrobe to do.
+
+| Item | Worn as |
+|---|---|
+| Wooden Club | Orange Toy Hammer |
+| Fruit Knife | Yellow Spatula |
+| Sword | Blazing Sword |
+| Yellow Umbrella | Bug Net |
+| Steely Throwing Knives | Plastic Slingshot |
+| Maple Sword | Green Candy Cane |
+| Ilbi Throwing Stars | Tiger Paw |
+| Golden Crow | Cupid's Crossbow |
+| Dragon Khanjar | Dual Plasma Blade |
+| Bamboo Hat | Blue Straw Hat |
+| Blue Bandana | Blue Feather Bandana |
+| Zakum Helmet | Camouflage Helmet |
+| Cotton Shirt | Bowling Shirt |
+| Sauna Robe | Graduation Gown |
+| Black Napoleon | Black Officer Uniform |
+| Blue Jeans | Blue Skinny Jeans |
+| Rubber Boots | Red Rain Boots |
+| Yellow Snowshoes | Beige Galoshes |
+| Facestompers | Military Boots |
+| Work Gloves | Brown Bandage |
+| Brown Gauntlets | Brown Baseball Glove |
+| Pink / Blue / Maple Cape | Pink / Blue / Green Nymph Wing |
+
+Shields, rings, earrings and pendants have no visible layer, which matches the
+client — they never showed on the character either.

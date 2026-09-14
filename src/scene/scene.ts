@@ -19,7 +19,8 @@ export interface Actor {
   pose: Pose;
   frame: number;
   frameTime: number;
-  bubble?: string;
+  /** Shop chat, the way the floor wrote it: the message, then rows of @ to shove it up. */
+  bubble?: string[];
   name?: string;
 }
 
@@ -209,31 +210,43 @@ export class Scene {
     ctx.restore();
   }
 
-  /** `S> Ilbi Throwing Stars @@@@` overhead, the way the floor advertised. §5 */
+  /**
+   * The shop balloon, as the Free Market actually looked: the pitch on top and
+   * rows of @ underneath, because that is how everyone shoved their text up
+   * where it could be read over the crowd. §5
+   */
   private drawBubble(ctx: CanvasRenderingContext2D, a: Actor, y: number) {
-    if (!a.bubble) return;
-    ctx.font = '10px Silkscreen, monospace';
+    if (!a.bubble || !a.bubble.length) return;
+    ctx.font = '11px Silkscreen, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const w = ctx.measureText(a.bubble).width + 16;
-    const top = y - 92;
-    ctx.fillStyle = 'rgba(250, 248, 240, 0.96)';
-    ctx.strokeStyle = '#1d1c18';
+    const lineH = 13;
+    const w = Math.max(...a.bubble.map((t) => ctx.measureText(t).width)) + 18;
+    const h = a.bubble.length * lineH + 8;
+    const bottom = y - 78;
+    const top = bottom - h;
+
+    ctx.fillStyle = 'rgba(253, 252, 248, 0.97)';
+    ctx.strokeStyle = '#14130f';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(a.x - w / 2, top, w, 20, 4);
+    ctx.roundRect(a.x - w / 2, top, w, h, 5);
     ctx.fill();
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(a.x - 5, top + 20);
-    ctx.lineTo(a.x + 5, top + 20);
-    ctx.lineTo(a.x, top + 27);
+    ctx.moveTo(a.x - 6, bottom - 1);
+    ctx.lineTo(a.x + 6, bottom - 1);
+    ctx.lineTo(a.x, bottom + 8);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(250, 248, 240, 0.96)';
+    ctx.fillStyle = 'rgba(253, 252, 248, 0.97)';
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#1d1c18';
-    ctx.fillText(a.bubble, a.x, top + 10);
+
+    a.bubble.forEach((line, i) => {
+      // The padding is written in the market's own colour: nobody reads it.
+      ctx.fillStyle = /^@+$/.test(line) ? '#b8b3a2' : '#14130f';
+      ctx.fillText(line, a.x, top + 4 + lineH * i + lineH / 2);
+    });
   }
 
   private drawName(ctx: CanvasRenderingContext2D, a: Actor, y: number) {

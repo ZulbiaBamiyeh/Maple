@@ -52,6 +52,40 @@ const POOL = {
   weapon: [1702000, 1702004, 1702015, 1702020, 1702024, 1702010, 1702016, 1702019, 1702001, 1702022],
 };
 
+/**
+ * What each §6.2 item looks like when it is actually worn. The extracted layer
+ * set is cash cosmetics, so these are stand-ins chosen for silhouette — but a
+ * player holding a Maple Sword has something in their hand, and swapping gear
+ * visibly changes the character, which is the point. Recorded in
+ * docs/item-substitutions.md.
+ */
+const GEAR_LOOKS = {
+  wooden_club: 1702010,      // Orange Toy Hammer
+  fruit_knife: 1702012,      // Yellow Spatula
+  sword: 1702024,            // Blazing Sword
+  yellow_umbrella: 1702015,  // Bug Net
+  steely: 1702003,           // Plastic Slingshot
+  maple_sword: 1702007,      // Green Candy Cane
+  ilbi: 1702009,             // Tiger Paw
+  golden_crow: 1702023,      // Cupid's Crossbow
+  dragon_khanjar: 1702000,   // Dual Plasma Blade
+  bamboo_hat: 1007071,       // Blue Straw Hat
+  blue_bandana: 1007121,     // Blue Feather Bandana
+  zakum_helmet: 1007055,     // Camouflage Helmet
+  cotton_shirt: 1047040,     // Bowling Shirt
+  sauna_robe: 1057013,       // Graduation Gown
+  black_napoleon: 1057031,   // Black Officer Uniform
+  blue_jeans: 1067077,       // Blue Skinny Jeans
+  rubber_boots: 1077009,     // Red Rain Boots
+  yellow_snowshoes: 1077021, // Beige Galoshes
+  facestompers: 1077015,     // Military Boots
+  work_gloves: 1087005,      // Brown Bandage
+  brown_gauntlets: 1087002,  // Brown Baseball Glove
+  pink_cape: 1107005,        // Pink Nymph Wing
+  blue_cape: 1107002,        // Blue Nymph Wing
+  maple_cape: 1107003,       // Green Nymph Wing
+};
+
 const SKINS = ['0', '1', '2', '3', '4'];
 
 /** Expressions the portrait boxes use to show a hawker's mood. */
@@ -181,6 +215,10 @@ function main() {
     manifest.skins[skin] = takePoses(base.poses[skin]);
   }
 
+  // Anything the §6.2 table can be wearing has to be vendored too.
+  POOL.gear = [...new Set(Object.values(GEAR_LOOKS))].filter(
+    (id) => !Object.values(POOL).flat().includes(id));
+
   for (const [group, ids] of Object.entries(POOL)) {
     manifest.pool[group] = [];
     for (const id of ids) {
@@ -228,6 +266,11 @@ function main() {
     iconMap[key] = { file: `items/${key}.png`, source: name, mapleId };
   }
   manifest.icons = iconMap;
+  manifest.gearLooks = {};
+  for (const [key, id] of Object.entries(GEAR_LOOKS)) {
+    if (manifest.equips[id]) manifest.gearLooks[key] = id;
+    else unresolved.push(`gear look ${key} (${id})`);
+  }
 
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest));
 

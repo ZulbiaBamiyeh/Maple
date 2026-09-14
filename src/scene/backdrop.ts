@@ -202,28 +202,76 @@ function ladder(ctx: CanvasRenderingContext2D) {
   }
 }
 
+/** Straw body, cross-beam arms, a sandbag head and a target nailed to its chest. */
 function dummy(ctx: CanvasRenderingContext2D, x: number, floorTop: number) {
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillStyle = 'rgba(0,0,0,0.34)';
   ctx.beginPath();
-  ctx.ellipse(x, floorTop - 2, 22, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, floorTop - 2, 30, 8, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // base and post
+  ctx.fillStyle = '#5a3d22';
+  ctx.fillRect(x - 22, floorTop - 12, 44, 12);
+  ctx.fillStyle = '#7a5430';
+  ctx.fillRect(x - 20, floorTop - 14, 40, 4);
   ctx.fillStyle = '#6b4a2c';
-  ctx.fillRect(x - 5, floorTop - 66, 10, 66);
-  ctx.fillStyle = '#c9b68a';
+  ctx.fillRect(x - 6, floorTop - 96, 12, 84);
+
+  // straw body
+  ctx.fillStyle = '#c9a352';
   ctx.beginPath();
-  ctx.arc(x, floorTop - 78, 22, 0, Math.PI * 2);
+  ctx.ellipse(x, floorTop - 66, 24, 30, 0, 0, Math.PI * 2);
   ctx.fill();
-  const rings = [['#e8e2cf', 22], ['#d2453f', 16], ['#e8e2cf', 10], ['#d2453f', 5]] as const;
+  ctx.fillStyle = '#dfbc6b';
+  ctx.beginPath();
+  ctx.ellipse(x - 6, floorTop - 72, 14, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#8a6b2c';
+  ctx.lineWidth = 1;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(x + i * 6, floorTop - 92);
+    ctx.lineTo(x + i * 7, floorTop - 40);
+    ctx.stroke();
+  }
+  // binding ropes
+  ctx.strokeStyle = '#4a3218';
+  ctx.lineWidth = 3;
+  for (const y of [floorTop - 80, floorTop - 56]) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, 23, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // cross-beam arms
+  ctx.fillStyle = '#6b4a2c';
+  ctx.fillRect(x - 42, floorTop - 84, 84, 9);
+  ctx.fillStyle = '#8a6238';
+  ctx.fillRect(x - 42, floorTop - 84, 84, 3);
+
+  // sandbag head
+  ctx.fillStyle = '#d8c9a2';
+  ctx.beginPath();
+  ctx.ellipse(x, floorTop - 106, 14, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4a3218';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(x, floorTop - 96, 12, 4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // target
+  const rings = [['#efe9d6', 15], ['#d2453f', 11], ['#efe9d6', 7], ['#d2453f', 3]] as const;
   for (const [c, r] of rings) {
     ctx.fillStyle = c as string;
     ctx.beginPath();
-    ctx.arc(x, floorTop - 78, r as number, 0, Math.PI * 2);
+    ctx.arc(x + 2, floorTop - 64, r as number, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.strokeStyle = '#4a3a24';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(x, floorTop - 78, 22, 0, Math.PI * 2);
+  ctx.arc(x + 2, floorTop - 64, 15, 0, Math.PI * 2);
   ctx.stroke();
 }
 

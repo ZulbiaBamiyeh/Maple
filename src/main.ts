@@ -14,6 +14,7 @@ import { ShopPanel } from './ui/shop';
 import { LedgerPanel } from './ui/ledger';
 import { TradeWindow } from './ui/trade';
 import { el, mesos } from './ui/dom';
+import { dressed, holding } from './ui/look';
 import { DummyWindow } from './ui/dummy';
 import { Arena } from './ui/arena';
 import { WagerWindow } from './ui/wager';
@@ -33,7 +34,7 @@ async function boot() {
   run.looks[0].sitting = false;
 
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
-  const scene = new Scene(canvas, run.looks[0]);
+  const scene = new Scene(canvas, dressed(run.looks[0], run.gear));
   scene.player.name = 'you';
   const hudDay = document.getElementById('hud-day')!;
   const hudMesos = document.getElementById('hud-mesos')!;
@@ -45,6 +46,8 @@ async function boot() {
     hudDay.textContent = `DAY ${run.day} / ${DAYS}`;
     hudMesos.innerHTML = `<b>${mesos(run.mesos)}</b> MESOS`;
     hudRecord.textContent = `${run.wins}W ${run.losses}L`;
+    // What you are wearing is what you look like, on the floor and in the window.
+    scene.player.look = dressed(run.looks[0], run.gear);
     inventory.render();
   };
 
@@ -71,7 +74,7 @@ async function boot() {
     scene.frozen = true;
   };
 
-  for (const win of [inventory.win, shop.win, dummy.win, ledger.win, trade.win, trade.bagWin, wager.win]) {
+  for (const win of [inventory.win, inventory.itemWin, shop.win, dummy.win, ledger.win, trade.win, trade.bagWin, wager.win]) {
     win.onClose = chain(win.onClose, () => { scene.frozen = anyOpen(); });
   }
 
@@ -84,12 +87,24 @@ async function boot() {
       || arena.isOpen;
   }
 
-  /** The floor advertises itself: `S> Ilbi Throwing Stars @@@@`, `B> any glove @@@`. §5 */
-  function bubbleFor(index: number): string {
+  const SHOUTS = ['pm me', 'cheap!!', 'fast trade', 'need mesos', 'first come', 'wont last', 'srs buyers only', 'no lowballs'];
+
+  /**
+   * The floor advertises itself. Everyone padded their shop chat with rows of @
+   * to push the real line up above the crowd, so this does too. §5
+   */
+  function bubbleFor(index: number): string[] {
     const h = run.hawkers[index];
-    if (!h) return '';
-    if (h.buyer) return `B> any ${SLOT_LABEL[h.wantSlot!].toLowerCase()} ${'@'.repeat(2 + (index % 3))}`;
-    return `S> ${item(h.give.id!).name} ${'@'.repeat(2 + (index % 4))}`;
+    if (!h) return [];
+    const rng = run.rng.derive(`bubble${run.day}:${index}`);
+    const lines: string[] = [];
+    lines.push(h.buyer
+      ? `B> any ${SLOT_LABEL[h.wantSlot!].toLowerCase()}`
+      : `S> ${item(h.give.id!).name}`);
+    if (rng.chance(0.55)) lines.push(rng.pick(SHOUTS));
+    const pad = rng.int(1, 3);
+    for (let i = 0; i < pad; i++) lines.push('@'.repeat(rng.int(7, 16)));
+    return lines;
   }
 
   function syncFloor() {
@@ -101,7 +116,8 @@ async function boot() {
       pose: 'sit', frame: 0, frameTime: 0,
     }));
     scene.npcs = run.hawkers.map((h, i): Actor => ({
-      look: h.look,
+      // A seller is visibly holding the thing they are selling. §4.4
+      look: h.give.type === 'item' ? holding(h.look, h.give.id) : h.look,
       x: WORLD.hawkers[i], floor: 'lower', facing: 1,
       pose: h.look.sitting ? 'sit' : 'stand1', frame: 0, frameTime: 0,
       bubble: h.gone ? undefined : bubbleFor(i),
@@ -147,7 +163,7 @@ async function boot() {
       scene.frozen = anyOpen();
     }
     if (e.key === 'Escape') {
-      for (const w of [inventory.win, shop.win, dummy.win, trade.win, trade.bagWin]) w.close();
+      for (const w of [inventory.win, inventory.itemWin, shop.win, dummy.win, trade.win, trade.bagWin]) w.close();
       hideTip();
       scene.frozen = false;
     }

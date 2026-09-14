@@ -15,6 +15,7 @@ import { Arena } from './arena';
 import { clear, el, timestamp } from './dom';
 import { bindTip, hideTip } from './tooltip';
 import { makeWindow, setTitle, type Win } from './window';
+import { dressed } from './look';
 
 type Phase = 'staking' | 'agreed' | 'regear' | 'fighting';
 
@@ -100,7 +101,7 @@ export class WagerWindow {
     setTitle(this.win, 'Wager');
     this.nameplate.textContent = `${name}   ${this.opp.wins}W ${this.opp.losses}L`;
     clear(this.portrait);
-    this.portrait.append(getCharacterSprite(look, 'stand1', 0).canvas);
+    this.portrait.append(getCharacterSprite(dressed(look, this.opp.gear), 'stand1', 0).canvas);
     this.oddsLine.textContent = '';
     this.acceptBtn.setAttribute('disabled', '');
     this.say(name, rng.pick(['u wanna go?', 'lets fight for it', 'put something up then', 'what are we playing for']));

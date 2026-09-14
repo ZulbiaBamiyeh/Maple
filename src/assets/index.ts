@@ -239,6 +239,29 @@ export function getCharacterSprite(
   return rendered;
 }
 
+/**
+ * Overlays what someone is actually holding and wearing onto their outfit, so
+ * the character on screen is the character in the equipment window. A slot with
+ * no visible layer — rings, earrings, shields — leaves the outfit alone.
+ */
+export function withGear(look: Look, gear: Record<string, number | undefined>, iconOf: (id: number) => string): Look {
+  const out: Look = { ...look };
+  for (const [slot, id] of Object.entries(gear)) {
+    if (typeof id !== 'number') continue;
+    const layer = manifest.gearLooks[iconOf(id)];
+    if (layer === undefined) continue;
+    const target = GEAR_SLOT[slot];
+    if (target) out[target] = layer;
+  }
+  return out;
+}
+
+/** §6.2 slots to the wardrobe slots the composer understands. */
+const GEAR_SLOT: Record<string, 'weapon' | 'cap' | 'coat' | 'pants' | 'shoes' | 'glove' | 'cape' | undefined> = {
+  weapon: 'weapon', helm: 'cap', body: 'coat', legs: 'pants',
+  boots: 'shoes', gloves: 'glove', cape: 'cape',
+};
+
 /** A head-and-shoulders crop for the trade window's portrait boxes. §4.5 */
 export function getPortrait(look: Look, expression: Expression = 'default'): Rendered {
   return getCharacterSprite(look, 'stand1', 0, expression);

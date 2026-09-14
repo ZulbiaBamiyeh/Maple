@@ -26,10 +26,12 @@ export interface Manifest {
   equips: Record<string, Equip>;
   pool: Record<PoolGroup, number[]>;
   icons: Record<string, { file: string; source: string; mapleId: number | null }>;
+  /** iconKey -> the sprite layer worn when that item is equipped. */
+  gearLooks: Record<string, number>;
 }
 
 export type PoolGroup =
-  | 'hair' | 'face' | 'cap' | 'coat' | 'pants' | 'shoes' | 'glove' | 'cape' | 'weapon';
+  | 'hair' | 'face' | 'cap' | 'coat' | 'pants' | 'shoes' | 'glove' | 'cape' | 'weapon' | 'gear';
 
 /** A character's full appearance. §4.4 */
 export interface Look {

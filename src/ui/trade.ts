@@ -18,6 +18,7 @@ import { logNegotiation } from '../core/log';
 import { clear, el, mesos, short, timestamp } from './dom';
 import { bindTip, hideTip } from './tooltip';
 import { makeWindow, setTitle, type Win } from './window';
+import { dressed, holding } from './look';
 
 interface Queued {
   line: Line;
@@ -179,9 +180,10 @@ export class TradeWindow {
   }
 
   private renderPortraits() {
+    const theirs = this.h.give.type === 'item' ? holding(this.h.look, this.h.give.id) : this.h.look;
     for (const [box, look, expr] of [
-      [this.theirPortrait, this.h.look, this.expression()],
-      [this.myPortrait, this.run.looks[0], 'default' as Expression],
+      [this.theirPortrait, theirs, this.expression()],
+      [this.myPortrait, dressed(this.run.looks[0], this.run.gear), 'default' as Expression],
     ] as const) {
       clear(box);
       if (!look) continue;

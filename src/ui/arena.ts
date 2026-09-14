@@ -11,6 +11,7 @@ import {
 import { SLOT_LABEL, item, type Slot } from '../core/items';
 import { Fx } from '../scene/fx';
 import { clear, el } from './dom';
+import { dressed } from './look';
 
 export interface Side {
   name: string;
@@ -280,7 +281,7 @@ export class Arena {
       const x = i === 0 ? ax : bx;
       const dead = (i === 0 ? this.fight!.a : this.fight!.b).hp <= 0;
       const r = getCharacterSprite(
-        doll.side.look,
+        dressed(doll.side.look, doll.side.gear),
         dead ? 'dead' : doll.pose,
         doll.frame,
         dead ? 'cry' : doll.flinch > 0 ? 'hit' : 'default',
