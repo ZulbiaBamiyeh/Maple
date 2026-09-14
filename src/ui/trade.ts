@@ -180,10 +180,7 @@ export class TradeWindow {
   }
 
   private renderPortraits() {
-    const worn = this.h.give.type === 'item'
-      ? { ...this.h.gear, [item(this.h.give.id!).slot]: this.h.give.id }
-      : this.h.gear;
-    const theirs = dressed(this.h.look, worn);
+    const theirs = dressed(this.h.look, this.h.gear);
     for (const [box, look, expr] of [
       [this.theirPortrait, theirs, this.expression()],
       [this.myPortrait, dressed(this.run.looks[0], this.run.gear), 'default' as Expression],

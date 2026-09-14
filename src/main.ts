@@ -117,8 +117,7 @@ async function boot() {
     }));
     scene.npcs = run.hawkers.map((h, i): Actor => ({
       look: h.look,
-      // They wear their own gear, and a seller visibly holds what they are selling. §4.4
-      gear: h.give.type === 'item' ? { ...h.gear, [item(h.give.id!).slot]: h.give.id } : h.gear,
+      gear: h.gear,
       x: WORLD.hawkers[i], floor: 'lower', facing: 1,
       pose: h.look.sitting ? 'sit' : 'stand1', frame: 0, frameTime: 0,
       bubble: h.gone ? undefined : bubbleFor(i),

@@ -1,50 +1,50 @@
-import { getCharacterSprite, getItemIcon } from '../assets/index';
+import { getItemIcon } from '../assets/index';
 import { rollUp } from '../core/combat';
-import { item, SLOTS, type Slot } from '../core/items';
+import { item, type Slot } from '../core/items';
 import { equip, sellToStall, unequip, type Run } from '../core/game';
 import { clear, el, mesos } from './dom';
 import { bindTip, hideTip } from './tooltip';
-import { dressed } from './look';
 import { makeWindow, type Win } from './window';
 
 /**
- * The client kept these apart, so this does too: an Equipment window laid out
- * anatomically around a character preview, and a separate Item window with the
- * tab strip across the top and the mesos row along the bottom. §4.5
+ * Two windows, the way the client had them: an Equipment Inventory with the
+ * slots laid out anatomically over a body outline and captioned, and an Item
+ * Inventory with the tab strip, a 4x6 grid and the meso line. §4.5
  */
 
-/** The anatomical grid. `null` is a blank cell — the shape is the point. */
-const LAYOUT: (Slot | null)[][] = [
-  ['ring', null, 'helm', null],
-  ['ring', 'earring', 'pendant', 'cape'],
-  ['ring', 'body', 'legs', 'boots'],
-  ['ring', 'gloves', 'shield', 'weapon'],
+/** Slot captions and where they sit on the figure, as percentages of the panel. */
+const PLACES: { slot: Slot; label: string; x: number; y: number }[] = [
+  { slot: 'pendant', label: 'PENDANT', x: 20, y: 2 },
+  { slot: 'helm', label: 'FOREHEAD', x: 50, y: 2 },
+  { slot: 'earring', label: 'EARS', x: 80, y: 2 },
+  { slot: 'gloves', label: 'GLOVES', x: 20, y: 26 },
+  { slot: 'body', label: 'TOP', x: 50, y: 26 },
+  { slot: 'cape', label: 'CAPE', x: 80, y: 26 },
+  { slot: 'weapon', label: 'WEAPON', x: 20, y: 50 },
+  { slot: 'legs', label: 'PANTLEG', x: 50, y: 50 },
+  { slot: 'shield', label: 'SHIELD', x: 80, y: 50 },
+  { slot: 'ring', label: 'RING', x: 20, y: 74 },
+  { slot: 'boots', label: 'SHOES', x: 50, y: 74 },
 ];
 
-const TABS = ['Equip', 'Use', 'Etc', 'Set-up', 'Cash'] as const;
+const TABS = ['Equip', 'Use', 'Set-up', 'Etc'] as const;
 
 export class InventoryPanel {
   readonly win: Win;
   readonly itemWin: Win;
-  private doll = el('div', 'doll');
-  private slots = el('div', 'eq-grid');
+  private board = el('div', 'eq-board');
   private stats = el('div', 'statlist');
   private bag = el('div', 'grid');
-  private purse = el('div', 'mesos-row');
+  private purse = el('div', 'meso-line');
   private tabStrip = el('div', 'tabs');
   private activeTab = 0;
 
   constructor(private run: Run, private onChange: () => void) {
-    this.win = makeWindow('Equipment Inventory', { x: 40, y: 66, width: 302 });
-    const row = el('div', 'eq-row');
-    const dollPanel = el('div', 'panel eq-doll');
-    dollPanel.append(this.doll);
-    row.append(dollPanel, this.slots);
-    const statPanel = el('div', 'panel');
-    statPanel.append(this.stats);
-    this.win.body.append(row, statPanel);
+    this.win = makeWindow('Equipment Inventory', { x: 40, y: 66, width: 250 });
+    this.board.append(figure());
+    this.win.body.append(this.board, wrapPanel(this.stats));
 
-    this.itemWin = makeWindow('Item Inventory', { x: 360, y: 66, width: 206 });
+    this.itemWin = makeWindow('Item Inventory', { x: 320, y: 66, width: 188 });
     TABS.forEach((name, i) => {
       const tab = el('div', 'tab' + (i === 0 ? ' on' : ''), name);
       tab.addEventListener('click', () => {
@@ -56,12 +56,7 @@ export class InventoryPanel {
     });
     const bagPanel = el('div', 'panel');
     bagPanel.append(this.bag);
-    const coin = el('div', 'coin');
-    this.purse.append(coin, el('span', undefined, '0'));
-    const pursePanel = el('div', 'panel');
-    pursePanel.style.padding = '4px 6px';
-    pursePanel.append(this.purse);
-    this.itemWin.body.append(this.tabStrip, bagPanel, pursePanel);
+    this.itemWin.body.append(this.tabStrip, bagPanel, this.purse);
 
     this.win.onClose = () => this.itemWin.close();
   }
@@ -77,42 +72,34 @@ export class InventoryPanel {
   render() {
     const run = this.run;
 
-    clear(this.doll);
-    const base = run.looks[0] ?? { skin: '0', face: 20000, hair: 30030, sitting: false };
-    this.doll.append(getCharacterSprite(dressed(base, run.gear), 'stand1', 0).canvas);
-
-    clear(this.slots);
-    const ringsUsed: number[] = [];
-    for (const rowSlots of LAYOUT) {
-      for (const slot of rowSlots) {
-        if (!slot) { this.slots.append(el('div', 'eq-blank')); continue; }
-        // Four ring cells, one ring slot — the extra three stay empty, as they did.
-        const id = slot === 'ring'
-          ? (ringsUsed.length === 0 ? run.gear.ring : undefined)
-          : run.gear[slot];
-        if (slot === 'ring') ringsUsed.push(1);
-        const cell = el('div', 'slot' + (id !== undefined ? ' filled' : ''));
-        if (id !== undefined) {
-          const it = item(id);
-          const img = el('img');
-          img.src = getItemIcon(it.iconKey);
-          cell.append(img);
-          bindTip(cell, () => ({ item: it }));
-          cell.addEventListener('click', () => {
-            unequip(run, slot);
-            hideTip();
-            this.render();
-            this.onChange();
-          });
-        }
-        this.slots.append(cell);
+    for (const node of Array.from(this.board.querySelectorAll('.eq-place'))) node.remove();
+    for (const place of PLACES) {
+      const holder = el('div', 'eq-place');
+      holder.style.left = place.x + '%';
+      holder.style.top = place.y + '%';
+      holder.append(el('div', 'eq-cap', place.label));
+      const id = run.gear[place.slot];
+      const cell = el('div', 'slot' + (id !== undefined ? ' filled' : ''));
+      if (id !== undefined) {
+        const it = item(id);
+        const img = el('img');
+        img.src = getItemIcon(it.iconKey);
+        cell.append(img);
+        bindTip(cell, () => ({ item: it }));
+        cell.addEventListener('click', () => {
+          unequip(run, place.slot);
+          hideTip();
+          this.render();
+          this.onChange();
+        });
       }
+      holder.append(cell);
+      this.board.append(holder);
     }
 
     clear(this.bag);
     const worn = new Set(Object.values(run.gear));
     const counted = new Map<number, number>();
-    // Only the Equip tab holds anything; the others are here because they were.
     if (this.activeTab === 0) for (const id of run.bag) counted.set(id, (counted.get(id) ?? 0) + 1);
     let shown = 0;
     for (const [id, n] of counted) {
@@ -122,7 +109,7 @@ export class InventoryPanel {
         const img = el('img');
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
-        if (worn.has(id) && k === 0) cell.append(el('div', 'tag', 'WORN'));
+        if (worn.has(id) && k === 0) cell.append(el('div', 'tag', 'E'));
         bindTip(cell, () => ({ item: it }));
         cell.addEventListener('click', () => { equip(run, it); this.render(); this.onChange(); });
         cell.addEventListener('contextmenu', (e) => {
@@ -148,8 +135,32 @@ export class InventoryPanel {
       `CRIT     ${s.crit}% / +${s.critDmg}%`,
     ]) this.stats.append(el('div', undefined, line));
 
-    (this.purse.lastChild as HTMLElement).textContent = mesos(run.mesos) + ' mesos';
+    this.purse.textContent = mesos(run.mesos) + ' mesos';
   }
 }
 
-export { SLOTS };
+function wrapPanel(node: HTMLElement): HTMLElement {
+  const p = el('div', 'panel');
+  p.append(node);
+  return p;
+}
+
+/** The faint figure the slots hang off. */
+function figure(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 150');
+  svg.setAttribute('class', 'eq-figure');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', [
+    'M50 8 a13 13 0 1 1 -0.1 0 Z',
+    'M38 34 h24 l6 8 v30 h-9 v46 h-8 v-30 h-2 v30 h-8 v-46 h-9 v-30 Z',
+    'M32 42 l-10 6 v26 h6 v-22 Z',
+    'M68 42 l10 6 v26 h-6 v-22 Z',
+  ].join(' '));
+  path.setAttribute('fill', 'rgba(255,255,255,0.55)');
+  path.setAttribute('stroke', 'rgba(90,100,120,0.45)');
+  path.setAttribute('stroke-width', '1');
+  svg.append(path);
+  return svg;
+}
