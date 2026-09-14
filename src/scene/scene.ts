@@ -213,7 +213,9 @@ export class Scene {
     const r = getCharacterSprite(dressed(a.look, gear), pose, a.frame);
     ctx.save();
     ctx.translate(a.x, y);
-    if (a.facing === -1) ctx.scale(-1, 1);
+    // The source art is authored facing left; flip only for rightward travel,
+    // and never on the ladder — climbing art doesn't care which way you approached.
+    if (a.facing === 1 && pose !== 'ladder') ctx.scale(-1, 1);
     ctx.drawImage(r.canvas, -r.anchor.x, -r.anchor.y);
     ctx.restore();
   }
