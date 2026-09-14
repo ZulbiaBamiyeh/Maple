@@ -142,15 +142,21 @@ function trimPart(p) {
   return out;
 }
 
-const copied = new Set();
+/**
+ * Sprites are folded into the manifest as data URIs rather than written out as
+ * files. There are ~1,600 of them and they come to well under a megabyte, so one
+ * request beats sixteen hundred — and it keeps the game to a handful of files,
+ * which is what most static hosts want.
+ */
+const inlined = new Map();
+let inlinedBytes = 0;
 function copyAsset(url) {
-  if (copied.has(url)) return;
+  if (inlined.has(url)) return;
   const src = path.join(PLAYGROUND, url);
   if (!fs.existsSync(src)) { unresolved.push(`asset ${url}`); return; }
-  const dst = path.join(OUT, 'ms', url.replace(/^assets\//, ''));
-  fs.mkdirSync(path.dirname(dst), { recursive: true });
-  fs.copyFileSync(src, dst);
-  copied.add(url);
+  const bytes = fs.readFileSync(src);
+  inlinedBytes += bytes.length;
+  inlined.set(url, 'data:image/png;base64,' + bytes.toString('base64'));
 }
 
 /** Weapon layers key their poses by weapon type ("30/stand1/0"); everything else doesn't. */
@@ -272,10 +278,10 @@ function main() {
     else unresolved.push(`gear look ${key} (${id})`);
   }
 
+  manifest.sprites = Object.fromEntries(inlined);
   fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest));
 
-  const bytes = [...copied].reduce((n, u) => n + fs.statSync(path.join(PLAYGROUND, u)).size, 0);
-  console.log(`sprites  ${copied.size} files, ${(bytes / 1e6).toFixed(1)} MB`);
+  console.log(`sprites  ${inlined.size} inlined, ${(inlinedBytes / 1e6).toFixed(2)} MB of png`);
   console.log(`icons    ${Object.keys(iconMap).length}/${Object.keys(ICONS).length}`);
   console.log(`equips   ${Object.keys(manifest.equips).length} across ${Object.keys(POOL).length} groups`);
   console.log(`manifest ${(fs.statSync(path.join(OUT, 'manifest.json')).size / 1e6).toFixed(2)} MB`);

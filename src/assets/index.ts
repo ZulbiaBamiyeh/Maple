@@ -9,7 +9,8 @@ import type { Equip, Expression, Look, Manifest, Part, Pose } from './types';
 export type { Look, Pose, Expression, Part, Equip, Manifest } from './types';
 export type { PoolGroup } from './types';
 
-const BASE = (import.meta.env.BASE_URL ?? '/') + 'assets/';
+/** Relative to the page, so the build works at a domain root or under a path. */
+const BASE = new URL('assets/', document.baseURI).href;
 
 let manifest: Manifest;
 const images = new Map<string, HTMLImageElement>();
@@ -35,7 +36,7 @@ export function getItemIcon(iconKey: string): string {
 }
 
 function spriteUrl(part: Part): string {
-  return assetUrl('ms/' + part.url.replace(/^assets\//, ''));
+  return manifest.sprites[part.url] ?? '';
 }
 
 /** Decodes every sprite the wardrobe can reach, once, up front. */

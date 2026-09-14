@@ -28,6 +28,8 @@ export interface Manifest {
   icons: Record<string, { file: string; source: string; mapleId: number | null }>;
   /** iconKey -> the sprite layer worn when that item is equipped. */
   gearLooks: Record<string, number>;
+  /** Every sprite the wardrobe can reach, as a data URI. */
+  sprites: Record<string, string>;
 }
 
 export type PoolGroup =

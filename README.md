@@ -59,6 +59,14 @@ whale/consignment counterparty scarcity of §11.4. Hawkers can already
 misrepresent goods and the inspect action exists, but the full scam-back kit is
 thin.
 
+## Deploying
+
+`npm run build` writes a static site to `dist/` — 38 files, about 1.8 MB, no
+server needed. On Cloudflare Pages: point a project at this repo with build
+command `npm run build` and output directory `dist`, no framework preset. Any
+other static host works the same way; the page uses relative asset paths, so it
+runs at a domain root or under a path.
+
 ## Artwork
 
 MapleStory artwork and names belong to Nexon and Wizet. This is an unofficial fan
