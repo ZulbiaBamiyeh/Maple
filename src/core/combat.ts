@@ -27,7 +27,7 @@ export interface Stats {
   hp: number;
 }
 
-export const BASE_HP = 300;
+export const BASE_HP = 190;
 
 export function rollUp(gear: Partial<Record<Slot, number>>): Stats {
   const worn = Object.values(gear).filter((v): v is number => typeof v === 'number').map(item);
@@ -61,13 +61,18 @@ interface Effects {
   healPerBurnStack: number;
   slowToFreeze: number;
   spdPctVsSlowed: number;
+  /** Attackers take this much, and armour does not help them. §9.3 */
+  thorns: number;
+  /** Heal per second — the fast early healing that answers a burn build. §9.7 */
+  regen: number;
   procs: { chance: number; status: Status; dur: number; slot: Slot }[];
 }
 
 function effectsOf(gear: Partial<Record<Slot, number>>): Effects {
   const e: Effects = {
     onHitBurn: 0, burnExtraStack: 0, burnBonusPerStack: 0, burnNoDecay: false,
-    burnDouble: false, healPerBurnStack: 0, slowToFreeze: 0, spdPctVsSlowed: 0, procs: [],
+    burnDouble: false, healPerBurnStack: 0, slowToFreeze: 0, spdPctVsSlowed: 0,
+    thorns: 0, regen: 0, procs: [],
   };
   for (const [slot, id] of Object.entries(gear)) {
     if (typeof id !== 'number') continue;
@@ -80,6 +85,8 @@ function effectsOf(gear: Partial<Record<Slot, number>>): Effects {
     e.healPerBurnStack += it.healPerBurnStack ?? 0;
     e.slowToFreeze = Math.max(e.slowToFreeze, it.slowToFreeze ?? 0);
     e.spdPctVsSlowed += it.spdPctVsSlowed ?? 0;
+    e.thorns += it.thorns ?? 0;
+    e.regen += it.regen ?? 0;
     if (it.proc) e.procs.push({ ...it.proc, slot: slot as Slot });
   }
   return e;
@@ -132,6 +139,16 @@ export interface Fight {
 /** Hard timeout at 20s; the higher HP% takes it. That kills stalls. §9.6 */
 export const TIMEOUT = 20;
 
+/** Armour halves incoming damage at this value. */
+export const ARMOUR_K = 26;
+
+/**
+ * A ceiling on stacking statuses. Without it a burn build's damage grows with
+ * the square of the clock and nothing in the table can answer it. §9.7 asks for
+ * every build to have a counter, and this is what makes one possible.
+ */
+export const MAX_STACKS = 4;
+
 export function startFight(rng: Rng, a: Loadout, b: Loadout): Fight {
   return { a: makeFighter(a), b: makeFighter(b), t: 0, over: false, rng };
 }
@@ -146,7 +163,7 @@ function attackInterval(f: Fighter, foe: Fighter): number {
 function applyBurn(rng: Rng, src: Fighter, target: Fighter, out: CombatEvent[], side: 0 | 1) {
   const stacks = src.fx.onHitBurn + (src.fx.onHitBurn > 0 ? src.fx.burnExtraStack : 0);
   if (stacks <= 0) return;
-  target.burn += stacks;
+  target.burn = Math.min(MAX_STACKS, target.burn + stacks);
   out.push({ type: 'status', side: side === 0 ? 1 : 0, status: 'burn' });
   void rng;
 }
@@ -156,14 +173,22 @@ function swing(fight: Fight, side: 0 | 1, out: CombatEvent[]) {
   const foe = side === 0 ? fight.b : fight.a;
   const rng = fight.rng;
 
-  let dmg = rng.int(f.stats.min, f.stats.max) + f.stats.str - foe.stats.armour;
-  dmg = Math.max(1, dmg);
+  const raw = rng.int(f.stats.min, f.stats.max) + f.stats.str;
+  // Armour blunts a hit, it never deletes one: flat subtraction would reduce a
+  // 9-14 weapon to nothing against a heavy build and make half the table junk.
+  let dmg = Math.max(1, Math.round(raw * (1 - foe.stats.armour / (foe.stats.armour + ARMOUR_K))));
   if (f.weaken > 0) dmg = Math.round(dmg * 0.7);
   const crit = rng.chance(clamp(f.stats.crit, 0, 95) / 100);
   if (crit) dmg = Math.round(dmg * (1.75 + f.stats.critDmg / 100));
 
   foe.hp -= dmg;
   out.push({ type: 'hit', side: side === 0 ? 1 : 0, amount: dmg, crit });
+
+  // Thorns do not care how fast you swing — which is the point of them.
+  if (foe.fx.thorns > 0) {
+    f.hp -= foe.fx.thorns;
+    out.push({ type: 'tick', side, amount: foe.fx.thorns, status: 'thorns' });
+  }
 
   applyBurn(rng, f, foe, out, side);
 
@@ -175,13 +200,14 @@ function swing(fight: Fight, side: 0 | 1, out: CombatEvent[]) {
     if (status === 'slow') foe.slow = Math.max(foe.slow, p.dur);
     else if (status === 'freeze') foe.freeze = Math.max(foe.freeze, 1.5);
     else if (status === 'weaken') foe.weaken = Math.max(foe.weaken, p.dur);
-    else if (status === 'burn') foe.burn += 1;
-    else if (status === 'poison') foe.poison += 1;
+    else if (status === 'burn') foe.burn = Math.min(MAX_STACKS, foe.burn + 1);
+    else if (status === 'poison') foe.poison = Math.min(MAX_STACKS, foe.poison + 1);
     out.push({ type: 'proc', side, slot: p.slot, status });
     out.push({ type: 'status', side: side === 0 ? 1 : 0, status });
   }
 }
 
+/** `f` is the one burning; the amplifiers belong to whoever set them alight. */
 function tickStatuses(fight: Fight, f: Fighter, side: 0 | 1, dt: number, out: CombatEvent[]) {
   f.slow = Math.max(0, f.slow - dt);
   f.freeze = Math.max(0, f.freeze - dt);
@@ -190,20 +216,27 @@ function tickStatuses(fight: Fight, f: Fighter, side: 0 | 1, dt: number, out: Co
   f.burnTick += dt;
   while (f.burnTick >= 1) {
     f.burnTick -= 1;
-    const foe = side === 0 ? fight.b : fight.a;
+    if (f.fx.regen > 0 && f.hp > 0) {
+      const heal = Math.min(f.fx.regen, f.maxHp - f.hp);
+      if (heal > 0) {
+        f.hp += heal;
+        out.push({ type: 'heal', side, amount: heal });
+      }
+    }
+    const source = side === 0 ? fight.b : fight.a;
     if (f.burn > 0) {
       // Burn ignores armour, and the Zakum Helmet makes every stack bite harder.
-      let per = 3 + foe.fx.burnBonusPerStack;
-      if (foe.fx.burnDouble) per *= 2;
+      let per = 3 + source.fx.burnBonusPerStack;
+      if (source.fx.burnDouble) per *= 2;
       const amount = f.burn * per;
       f.hp -= amount;
       out.push({ type: 'tick', side, amount, status: 'burn' });
-      if (foe.fx.healPerBurnStack) {
-        const heal = f.burn * foe.fx.healPerBurnStack;
-        foe.hp = Math.min(foe.maxHp, foe.hp + heal);
+      if (source.fx.healPerBurnStack) {
+        const heal = f.burn * source.fx.healPerBurnStack;
+        source.hp = Math.min(source.maxHp, source.hp + heal);
         out.push({ type: 'heal', side: side === 0 ? 1 : 0, amount: heal });
       }
-      if (!foe.fx.burnNoDecay && fight.rng.chance(0.35)) f.burn--;
+      if (!source.fx.burnNoDecay && fight.rng.chance(0.35)) f.burn--;
     }
     if (f.poison > 0) {
       const amount = f.poison * 2;

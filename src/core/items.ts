@@ -1,4 +1,4 @@
-import itemData from '../../data/items.json';
+import itemData from '../../data/items.json' with { type: 'json' };
 
 export type Slot =
   | 'weapon' | 'helm' | 'shield' | 'body' | 'legs' | 'boots'
@@ -39,6 +39,8 @@ export interface Item {
   burnNoDecay?: boolean;
   burnDouble?: boolean;
   healPerBurnStack?: number;
+  thorns?: number;
+  regen?: number;
   slowToFreeze?: number;
   /** Passive and proc lines, shown verbatim in the tooltip. §9.2 */
   text: string[];
@@ -79,5 +81,7 @@ export function statLines(it: Item): string[] {
   if (it.crit) out.push(`CRIT RATE  +${it.crit}%`);
   if (it.critDmg) out.push(`CRIT DAMAGE  +${it.critDmg}%`);
   if (it.spdPct) out.push(`ATTACK SPEED  +${it.spdPct}%`);
+  if (it.thorns) out.push(`THORNS  ${it.thorns}`);
+  if (it.regen) out.push(`REGEN  ${it.regen} /s`);
   return out;
 }
