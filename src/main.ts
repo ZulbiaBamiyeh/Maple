@@ -1,0 +1,221 @@
+import './ui/style.css';
+import { assets, loadAssets, preloadSprites } from './assets/index';
+import { makeAppearance, makeDistinctAppearances, type Wardrobe } from './core/appearance';
+import { DAYS, endDay, newRun, TARGET, type Run } from './core/game';
+import { item, SLOT_LABEL } from './core/items';
+import { Rng } from './core/rng';
+import { mesoWord } from './core/negotiate';
+import { dumpAll, logDay } from './core/log';
+import { Scene, type Actor } from './scene/scene';
+import { WORLD, floorY, targets, type Target } from './scene/world';
+import { initTooltip, hideTip } from './ui/tooltip';
+import { InventoryPanel } from './ui/inventory';
+import { ShopPanel } from './ui/shop';
+import { LedgerPanel } from './ui/ledger';
+import { TradeWindow } from './ui/trade';
+import { el, mesos } from './ui/dom';
+import { DummyWindow } from './ui/dummy';
+
+async function boot() {
+  await loadAssets();
+  const manifest = assets();
+  const wardrobe: Wardrobe = manifest.pool as unknown as Wardrobe;
+  await preloadSprites();
+
+  initTooltip();
+
+  const seed = new URLSearchParams(location.search).get('seed') ?? String(Date.now());
+  const run: Run = newRun(seed, wardrobe);
+  const lookRng = new Rng(seed + ':player');
+  run.looks = [makeAppearance(lookRng, wardrobe, 1)];
+  run.looks[0].sitting = false;
+
+  const canvas = document.getElementById('scene') as HTMLCanvasElement;
+  const scene = new Scene(canvas, run.looks[0]);
+  scene.player.name = 'you';
+  const hudDay = document.getElementById('hud-day')!;
+  const hudMesos = document.getElementById('hud-mesos')!;
+  const hudRecord = document.getElementById('hud-record')!;
+  const hudHint = document.getElementById('hud-hint')!;
+  const banner = document.getElementById('banner')!;
+
+  const refresh = () => {
+    hudDay.textContent = `DAY ${run.day} / ${DAYS}`;
+    hudMesos.innerHTML = `<b>${mesos(run.mesos)}</b> MESOS`;
+    hudRecord.textContent = `${run.wins}W ${run.losses}L`;
+    inventory.render();
+  };
+
+  const inventory = new InventoryPanel(run, () => refresh());
+  const shop = new ShopPanel(run, () => refresh());
+  const dummy = new DummyWindow(run);
+  const ledger = new LedgerPanel(run, () => startDay());
+  const trade = new TradeWindow(run, () => refresh(), () => {
+    scene.frozen = false;
+    syncFloor();
+    refresh();
+  });
+
+  for (const win of [inventory.win, shop.win, dummy.win, ledger.win, trade.win, trade.bagWin]) {
+    win.onClose = chain(win.onClose, () => { scene.frozen = anyOpen(); });
+  }
+
+  function chain(a: (() => void) | undefined, b: () => void) {
+    return () => { a?.(); b(); };
+  }
+
+  function anyOpen(): boolean {
+    return [inventory.win, shop.win, dummy.win, ledger.win, trade.win].some((w) => w.isOpen);
+  }
+
+  /** The floor advertises itself: `S> Ilbi Throwing Stars @@@@`, `B> any glove @@@`. §5 */
+  function bubbleFor(index: number): string {
+    const h = run.hawkers[index];
+    if (!h) return '';
+    if (h.buyer) return `B> any ${SLOT_LABEL[h.wantSlot!].toLowerCase()} ${'@'.repeat(2 + (index % 3))}`;
+    return `S> ${item(h.give.id!).name} ${'@'.repeat(2 + (index % 4))}`;
+  }
+
+  function syncFloor() {
+    const rng = run.rng.derive(`floor${run.day}`);
+    const keeperLooks = run.stalls.map((s) => s.look);
+    scene.stallKeepers = keeperLooks.map((look, i): Actor => ({
+      look: { ...look, sitting: true },
+      x: WORLD.stalls[i] + 46, floor: 'upper', facing: -1,
+      pose: 'sit', frame: 0, frameTime: 0,
+    }));
+    scene.npcs = run.hawkers.map((h, i): Actor => ({
+      look: h.look,
+      x: WORLD.hawkers[i], floor: 'lower', facing: 1,
+      pose: h.look.sitting ? 'sit' : 'stand1', frame: 0, frameTime: 0,
+      bubble: h.gone ? undefined : bubbleFor(i),
+      name: h.name,
+    }));
+    scene.targets = targets(run.hawkers.map((h) => h.name), run.stalls.map((s) => s.name));
+    void rng;
+  }
+
+  scene.onPrompt = (t: Target | null) => {
+    hudHint.textContent = t
+      ? `↑  ${t.kind === 'hawker' ? 'talk to ' + t.label : t.kind === 'door' ? 'go home (ends the day)' : t.label}`
+      : '↑ interact · ↓ ladder · I gear';
+  };
+
+  scene.onInteract = (t: Target) => {
+    if (anyOpen()) return;
+    switch (t.kind) {
+      case 'stall':
+        shop.open(run.stalls[t.index]);
+        break;
+      case 'dummy':
+        dummy.open();
+        break;
+      case 'hawker': {
+        const h = run.hawkers[t.index];
+        if (!h || h.gone) return;
+        trade.open(h, run.rng.derive(`haggle${run.day}:${t.index}:${Math.random()}`));
+        break;
+      }
+      case 'door':
+        finishDay();
+        break;
+    }
+    scene.frozen = anyOpen();
+  };
+
+  window.addEventListener('keydown', (e) => {
+    if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+    if (e.key === 'i' || e.key === 'I') {
+      if (inventory.win.isOpen) inventory.win.close();
+      else inventory.open();
+      scene.frozen = anyOpen();
+    }
+    if (e.key === 'Escape') {
+      for (const w of [inventory.win, shop.win, dummy.win, trade.win, trade.bagWin]) w.close();
+      hideTip();
+      scene.frozen = false;
+    }
+    if (e.key === '`') dumpAll();
+  });
+
+  let dayStart = performance.now();
+  let bankrollStart = run.mesos;
+
+  function finishDay() {
+    const entries = run.ledger;
+    const from = bankrollStart;
+    logDay({
+      day: run.day,
+      seconds: (performance.now() - dayStart) / 1000,
+      bankrollStart: from,
+      bankrollEnd: run.mesos,
+      unsoldMarkups: run.stalls.flatMap((s) =>
+        s.stock.filter((e) => !e.sold).map((e) => e.ask / item(e.itemId).price)),
+    });
+    const day = run.day;
+    endDay(run);
+    scene.frozen = true;
+    ledger.show(day, entries, from, run.mesos);
+  }
+
+  function startDay() {
+    if (run.over) return showEnding();
+    dayStart = performance.now();
+    bankrollStart = run.mesos;
+    syncFloor();
+    refresh();
+    scene.frozen = false;
+    showBanner(`DAY ${run.day}`);
+  }
+
+  function showEnding() {
+    const text = run.over === 'won'
+      ? `CASHED OUT ON DAY ${run.day}`
+      : run.over === 'closed'
+        ? 'THE MARKET IS CLOSED TO YOU'
+        : run.over === 'busted'
+          ? `BUSTED · PEAK ${mesoWord(run.peak)}`
+          : `TWELVE DAYS · ${mesoWord(run.mesos)} OF ${mesoWord(TARGET)}`;
+    banner.textContent = text;
+    banner.classList.add('on');
+    scene.frozen = true;
+    dumpAll();
+  }
+
+  function showBanner(text: string) {
+    banner.textContent = text;
+    banner.classList.add('on');
+    setTimeout(() => banner.classList.remove('on'), 1300);
+  }
+
+  syncFloor();
+  refresh();
+  showBanner('DAY 1');
+
+  if (import.meta.env.DEV) {
+    // A handle for the screenshot harness. Development only.
+    (window as unknown as Record<string, unknown>).__lr = {
+      run, scene, trade, shop, inventory, dummy, ledger,
+      haggle: (i: number) => trade.open(run.hawkers[i], run.rng.derive('dev' + i)),
+    };
+  }
+
+  let last = performance.now();
+  function frame(now: number) {
+    const dtMs = Math.min(64, now - last);
+    last = now;
+    scene.frozen = anyOpen();
+    scene.update(dtMs / 1000);
+    scene.draw();
+    trade.step(dtMs);
+    dummy.step(dtMs / 1000, scene);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  void makeDistinctAppearances;
+  void el;
+  void floorY;
+}
+
+boot();
