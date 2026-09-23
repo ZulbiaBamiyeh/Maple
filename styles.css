@@ -21,7 +21,8 @@
   --epic: #b77cf0;
   --font: 'Pixelify Sans', 'Trebuchet MS', system-ui, sans-serif;
   --num: 'Silkscreen', 'Pixelify Sans', monospace;
-  --gutter: 14px;
+  --gutter: 16px;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -54,7 +55,7 @@ button { font-family: inherit; color: inherit; }
 .hud {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 0 10px; gap: 8px;
-  position: sticky; top: 0; z-index: 5;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
   background: linear-gradient(var(--ink) 70%, transparent);
 }
 .hud .lives, .hud .gold { display: flex; align-items: center; gap: 3px; }
