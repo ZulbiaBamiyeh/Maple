@@ -72,7 +72,11 @@ export const slotName = (inst) => {
 export const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 export function hud(run) {
-  const hearts = [0, 1, 2].map((i) => glyph(i < run.lives ? 'heart' : 'heartLost', 3)).join('');
+  const lostNow = run._shownLives !== undefined && run.lives < run._shownLives;
+  const goldBump = run._shownGold !== undefined && run.gold !== run._shownGold;
+  run._shownLives = run.lives;
+  run._shownGold = run.gold;
+  const hearts = [0, 1, 2].map((i) => `<span class="hrt ${lostNow && i === run.lives ? 'break' : ''}">${glyph(i < run.lives ? 'heart' : 'heartLost', 3)}</span>`).join('');
   const pips = [];
   const byRound = Object.fromEntries(run.history.map((h) => [h.round, h.result]));
   for (let r = 1; r <= ROUNDS; r++) {
@@ -83,7 +87,7 @@ export function hud(run) {
   return `<header class="hud">
     <div class="lives" aria-label="${run.lives} lives">${hearts}</div>
     <div><div class="pips">${pips.join('')}</div><div class="round-label">ROUND ${run.round}/${ROUNDS} · ${run.isDuel ? 'DUEL' : 'HUNT'}</div></div>
-    <div class="gold">${glyph('coin', 3)}<span>${run.gold}</span></div>
+    <div class="gold ${goldBump ? 'bump' : ''}">${glyph('coin', 3)}<span>${run.gold}</span></div>
   </header>`;
 }
 

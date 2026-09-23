@@ -66,14 +66,15 @@ const LEGS_SKIRT = [
 ];
 const LEGS_X = 10, LEGS_Y = 22;
 
+// Toes point right, the way the hero faces.
 const SHOES = [
-  '..aab..aab...',
-  '.aaab.aaab...',
+  '...bba..bba..',
+  '...bbaa.bbaa.',
 ];
 const SHOES_EQUIPPED = [
-  '..TTU..TTU...',
-  '.778..7789...',
-  '7789.77889...',
+  '...TTU..TTU..',
+  '...789..789..',
+  '...7889.7889.',
 ];
 const FEET_X = 10, FEET_Y = 27;
 

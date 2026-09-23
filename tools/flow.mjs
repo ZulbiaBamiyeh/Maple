@@ -16,12 +16,12 @@ const server = http.createServer((req, res) => {
 const out = process.argv[2] || '.';
 const seed = process.argv[3] || '42';
 const browser = await chromium.launch();
-const pg = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+const pg = await (await browser.newContext({ viewport: { width: +(process.env.VW || 390), height: 780 } })).newPage();
 pg.on('pageerror', (e) => console.log('[pageerror]', e.message));
 pg.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('ERR_CERT')) console.log('[console]', m.text()); });
 await pg.goto(`http://localhost:${server.address().port}/index.html?seed=${seed}`);
 await pg.waitForTimeout(400);
-const shot = async (n, full = true) => { await pg.screenshot({ path: path.join(out, n + '.png'), fullPage: full }); console.log('shot', n); };
+const shot = async (n, full = !process.env.NOFULL) => { await pg.screenshot({ path: path.join(out, n + '.png'), fullPage: full }); console.log('shot', n); };
 await pg.click('#start');
 await pg.waitForTimeout(300);
 await shot('01-pick');

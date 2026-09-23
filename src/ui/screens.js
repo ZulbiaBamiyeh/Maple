@@ -71,7 +71,7 @@ export function pickScreen(app, ctx) {
     const oh = m.onHit?.[0];
     const traitGlyph = oh ? statusGlyph(oh.apply, 2) : m.regen ? statusGlyph('regen', 2) : '';
     return `
-    <div class="mobcard panel" data-mob="${id}">
+    <div class="mobcard panel deal" data-mob="${id}" style="animation-delay:${run.offers.indexOf(id) * 0.1}s">
       <div class="portrait" data-scene="${m.family},3,0.84">${mobImg(m.sprite, 3)}</div>
       <div class="info">
         <div class="name">${m.name} <span class="chip tier-${m.tier}">${cap(m.tier)}</span></div>
@@ -111,6 +111,15 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
   const S = dollScale();
   const me = run.fighter();
   const h = headline(me);
+  const prev = ctx.prevHead;
+  const pop = ctx.popHero;
+  ctx.prevHead = null;
+  ctx.popHero = false;
+  const deltaBadge = (a, b, fmt = (x) => x) => {
+    if (!prev || Math.abs(b - a) < 0.05) return '';
+    const up = b > a;
+    return `<span class="delta ${up ? 'up-good' : 'down-bad'}">${up ? '▲' : '▼'} ${fmt(Math.abs(b - a))}</span>`;
+  };
   const counts = setCounts(run.equip);
   const on = new Set(activeSets(run.equip));
   const slotTile = (slot, label) => tile(run.equip[slot], { size: 2, attrs: `data-slot="${slot}"`, label });
@@ -156,12 +165,12 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
       ${mode !== 'duel' ? `<div><h2>${run.name}'s gear</h2><div class="sub">Tap any item to equip, scroll or scrap it.</div></div>` : ''}
       <div class="paperdoll panel">
         <div class="col">${slotTile('hat', 'Hat')}${slotTile('top', 'Top')}${slotTile('gloves', 'Gloves')}${slotTile('shoes', 'Shoes')}</div>
-        <div class="doll-stage" data-scene="${mode === 'duel' ? 'duel' : 'slime'},${S},0.88">${heroImg(run.look, run.equip, S)}</div>
+        <div class="doll-stage ${pop ? 'pop' : ''}" data-scene="${mode === 'duel' ? 'duel' : 'slime'},${S},0.88">${heroImg(run.look, run.equip, S)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
         <div class="col right">${slotTile('weapon', 'Weapon')}${slotTile('trinket1', 'Trinket')}${slotTile('trinket2', 'Trinket')}</div>
       </div>
       <div class="headline">
-        <div class="stat-big panel"><span class="k">DPS</span><span class="v">${h.dps}</span></div>
-        <div class="stat-big panel"><span class="k">EHP</span><span class="v">${h.ehp}</span></div>
+        <div class="stat-big panel"><span class="k">DPS ${prev ? deltaBadge(prev.dps, h.dps, (x) => x.toFixed(1)) : ''}</span><span class="v">${h.dps}</span></div>
+        <div class="stat-big panel"><span class="k">EHP ${prev ? deltaBadge(prev.ehp, h.ehp, Math.round) : ''}</span><span class="v">${h.ehp}</span></div>
       </div>
       <div class="statrow panel">
         <span>HP <b>${me.maxHp}</b></span><span>Atk <b>${me.atk}</b></span><span>Def <b>${me.def}</b></span>
@@ -200,14 +209,23 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
 export function lootScreen(app, ctx) {
   const { run } = ctx;
   const before = run.headline();
+  const counts = setCounts(run.equip);
   const cards = run.loot.map((inst, i) => {
     const it = ITEMS[inst.item];
     const after = run.headline(run.withItem(inst));
     const fam = it.family ? ` · ${FAMILIES[it.family].name}` : '';
+    const tags = [];
+    if (after.dps > before.dps + 0.05) tags.push('<span class="tag up">▲ DPS</span>');
+    if (after.ehp > before.ehp) tags.push('<span class="tag up">▲ EHP</span>');
+    const cur = run.equip[run.slotFor(inst)];
+    const sameFam = cur && ITEMS[cur.item].family === it.family;
+    if (it.family && counts[it.family] === 1 && !sameFam) tags.push(`<span class="tag set">Completes ${FAMILIES[it.family].set.name}</span>`);
+    if (!tags.length) tags.push('<span class="tag">For the bag</span>');
     return `
-    <div class="lootcard panel" data-loot="${i}">
+    <div class="lootcard panel deal lc-${inst.rarity}" data-loot="${i}" style="animation-delay:${i * 0.12}s">
       ${tile(inst, { size: 2.5 })}
       <div>
+        <div class="tags">${tags.join('')}</div>
         <div class="nm rc-${inst.rarity}">${it.name}</div>
         <div class="meta">${RARITIES[inst.rarity].name} ${slotName(inst)}${fam}</div>
         <ul>${statLines(inst).map((l) => `<li>${l}</li>`).join('')}</ul>
@@ -356,6 +374,8 @@ export function itemSheet(ctx, inst, where) {
       }
       const act = b.dataset.act;
       if (act === 'close') return closeSheet();
+      ctx.prevHead = run.headline();
+      ctx.popHero = act === 'equip';
       if (where.from === 'loot') {
         if (act === 'scrap') toast(`+${sv} gold`, 'gold');
         run.takeLoot(inst, act, b.dataset.to);

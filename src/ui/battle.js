@@ -1,37 +1,61 @@
 // Battle screen: replays simulate()'s frames and events. Nothing here decides
 // the fight; it only draws it.
+//
+// Two cursors walk the event list. The *anim* cursor runs a little ahead of
+// fight time and starts each attack's wind-up early, so the strike lands on
+// exactly the tick where the damage happens. The *apply* cursor fires the
+// impact: flash, sparks, damage number, HP bar.
 
 import { TPS } from '../sim.js';
 import { gridToCanvas, silhouette } from '../art/pixel.js';
 import { heroGrid } from '../art/hero.js';
 import { mobGrid } from '../art/mobs.js';
+import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
-import { MOBS, STATUSES } from '../data.js';
+import { RAMPS } from '../art/palette.js';
+import { ITEMS, MOBS, STATUSES } from '../data.js';
 import { hud, equipIds, statusChip } from './common.js';
 
-const SOURCE_COLOR = {
-  Hits: '#f4f1ff', Crits: '#f58a3a', burn: '#f58a3a', poison: '#6cc24a', bleed: '#d9434f', thorns: '#aeb4c8',
-};
+const LEAD = 0.16; // real seconds from wind-up start to the strike
+const INTRO = 0.75; // real seconds before the first tick plays
+
+// How each mob attacks.
+const MOB_STYLE = { slime: 'hop', shroom: 'hop', boar: 'charge', wisp: 'cast', golem: 'slam', imp: 'lunge' };
+// How close each style gets to its target before striking, in pixels of gap
+// left between them. Ranged styles barely step forward.
+const CLOSE = { dagger: 4, sword: 9, spear: 18, mace: 8, axe: 9, fist: 3, hop: 2, charge: 0, slam: 6, lunge: 4 };
+const RANGED = new Set(['staff', 'cast']);
+
+const SOURCE_COLOR = { Hits: '#f4f1ff', Crits: '#f58a3a', burn: '#f58a3a', poison: '#6cc24a', bleed: '#d9434f', thorns: '#aeb4c8' };
+
+const glyphCanvas = new Map();
+function glyphC(status) {
+  const k = STATUS_GLYPH[status] || 'star';
+  if (!glyphCanvas.has(k)) glyphCanvas.set(k, gridToCanvas(glyphGrid(k)));
+  return glyphCanvas.get(k);
+}
 
 export function showBattle(app, run, fight, onDone) {
   const { result, me, foe, duel, mobId } = fight;
   const biome = duel ? 'duel' : MOBS[mobId].family;
   const names = [me.name, foe.name];
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   app.innerHTML = `
     ${hud(run)}
     <section class="screen battle">
-      <div class="arena panel" id="arena"><canvas id="arena-c"></canvas><div id="fx"></div></div>
-      <div class="fighters">
+      <div class="arena" id="arena">
+        <canvas id="arena-c"></canvas>
         ${[0, 1].map((i) => `
-        <div class="fui panel" id="fui${i}">
-          <div class="nm">${names[i]}</div>
-          <div class="chips" id="chips${i}"></div>
-          <div class="bar hp" id="hp${i}"><div class="lag"></div><div class="fill"></div><div class="shield"></div><div class="txt"></div></div>
+        <div class="ov ov${i}" id="fui${i}">
+          <div class="nmrow"><span class="nm">${names[i]}</span><span class="hpn" id="hpn${i}"></span></div>
+          <div class="bar hp" id="hp${i}"><div class="lag"></div><div class="fill"></div><div class="shield"></div></div>
           <div class="bar timer" id="tm${i}"><div class="fill"></div></div>
+          <div class="chips" id="chips${i}"></div>
         </div>`).join('')}
+        <div id="fx"></div>
       </div>
-      <div class="log panel" id="log"></div>
+      <div class="log" id="log"></div>
       <div class="actions sticky" id="acts">
         <button class="btn small on" data-speed="1">1×</button>
         <button class="btn small" data-speed="2">2×</button>
@@ -43,110 +67,229 @@ export function showBattle(app, run, fight, onDone) {
   const arena = app.querySelector('#arena');
   const canvas = app.querySelector('#arena-c');
   const cw = arena.clientWidth || 360;
-  const S = cw >= 330 ? 3 : 2;
+  const S = cw >= 300 ? 3 : 2;
   const W = Math.floor(cw / S);
-  const H = 82;
-  const groundY = H - 14;
+  const H = Math.max(104, Math.min(136, Math.floor((window.innerHeight * 0.46) / S)));
+  const groundY = H - 16;
   canvas.width = W;
   canvas.height = H;
   canvas.style.width = `${W * S}px`;
   canvas.style.height = `${H * S}px`;
-  canvas.style.margin = '0 auto';
   const ctx = canvas.getContext('2d');
   const bg = document.createElement('canvas');
   bg.width = W; bg.height = H;
   drawScene(bg.getContext('2d'), W, H, biome, groundY, run.round * 7 + 1);
 
   // ---- sprites
+  const weaponInfo = (equip) => {
+    const inst = equip.weapon;
+    if (!inst) return { style: 'fist', color: '#f4f1ff' };
+    const it = ITEMS[inst.item];
+    const ramp = RAMPS[it.ramp] || RAMPS.steel;
+    return { style: it.type, color: ramp[1], light: ramp[0] };
+  };
   function heroSprites(look, equip) {
     const ids = equipIds(equip);
     const idle = heroGrid(look, ids, 'idle');
     const swing = heroGrid(look, ids, 'swing');
     return {
-      idle: gridToCanvas(idle), swing: gridToCanvas(swing),
+      idle: gridToCanvas(idle), swing: gridToCanvas(swing), grid: idle,
       white: gridToCanvas(silhouette(idle)), blue: gridToCanvas(silhouette(idle, '#7fd8e8')),
-      w: 48, h: 44, cx: 24, bottom: 41, headTop: 9,
+      red: gridToCanvas(silhouette(idle, '#ff5a5a')),
+      w: 48, h: 44, cx: 24, bottom: 41, headTop: 9, chest: 20, ...weaponInfo(equip),
     };
   }
-  function mobSprites(sprite) {
-    const g = mobGrid(sprite);
+  function mobSprites(m) {
+    const g = mobGrid(m.sprite);
     const c = gridToCanvas(g);
-    return { idle: c, swing: c, white: gridToCanvas(silhouette(g)), blue: gridToCanvas(silhouette(g, '#7fd8e8')), w: 32, h: 32, cx: 16, bottom: 30, headTop: 2 };
+    const style = MOB_STYLE[m.sprite] || 'lunge';
+    const color = { wisp: '#9fe0ff', imp: '#f58a3a' }[m.sprite] || '#f4f1ff';
+    return {
+      idle: c, swing: c, grid: g, white: gridToCanvas(silhouette(g)), blue: gridToCanvas(silhouette(g, '#7fd8e8')),
+      red: gridToCanvas(silhouette(g, '#ff5a5a')),
+      w: 32, h: 32, cx: 16, bottom: 30, headTop: 3, chest: 13, style, color, light: '#ffffff', mob: true,
+    };
   }
   const F = [
-    { ...heroSprites(run.look, run.equip), face: 1, flip: false, x: Math.round(W * 0.27) },
+    { ...heroSprites(run.look, run.equip), face: 1, flip: false, x: Math.round(W * 0.3) },
     duel
-      ? { ...heroSprites(run.ghost.look, run.ghost.equip), face: -1, flip: true, x: Math.round(W * 0.73) }
-      : { ...mobSprites(MOBS[mobId].sprite), face: -1, flip: false, x: Math.round(W * 0.73) },
+      ? { ...heroSprites(run.ghost.look, run.ghost.equip), face: -1, flip: true, x: Math.round(W * 0.7) }
+      : { ...mobSprites(MOBS[mobId]), face: -1, flip: false, x: Math.round(W * 0.7) },
   ];
-  for (const f of F) Object.assign(f, { lungeAt: -9, hitAt: -9, deadAt: null, noise: null });
+  F.forEach((f, i) => Object.assign(f, {
+    i, act: null, flashAt: -9, flashColor: 'white', kickAt: -9, deadAt: null, winAt: null, statuses: [],
+  }));
+  F[0].interval = me.weapon.interval / Math.max(0.25, 1 + me.haste);
+  F[1].interval = foe.weapon.interval / Math.max(0.25, 1 + foe.haste);
 
   // ---- playback state
   let speed = 1;
-  let t = 0; // seconds of fight time
-  let rt = 0; // real seconds, drives the animations
-  let evIdx = 0;
+  let t = 0; // fight seconds
+  let rt = 0; // real seconds; drives every animation
+  let applyIdx = 0;
+  let animIdx = 0;
   let done = false;
   let finishedAt = null;
+  let shake = 0;
   let last = performance.now();
   const particles = [];
+  const effects = []; // slashes, projectiles, rings, glyph pops
   const lastTick = result.frames.length - 1;
   const logEl = app.querySelector('#log');
   const fx = app.querySelector('#fx');
   const logLines = [];
-  let stackN = [0, 0];
+  const stackN = [0, 0];
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const chestY = (f) => groundY - (f.bottom - f.chest);
+  const frontX = (f) => f.x + f.face * (f.mob ? 10 : 7);
 
   function log(html, cls = '') {
     logLines.push(`<div class="${cls}">${html}</div>`);
-    if (logLines.length > 5) logLines.shift();
+    if (logLines.length > 3) logLines.shift();
     logEl.innerHTML = logLines.join('');
   }
 
-  function floatNum(side, text, cls) {
+  function floatNum(side, text, cls, color) {
     const f = F[side];
-    const k = stackN[side]++ % 4;
+    const k = stackN[side]++ % 3;
     const el = document.createElement('div');
     el.className = `dmg ${cls}`;
     el.textContent = text;
-    const topPx = (groundY - (f.bottom - f.headTop) - 4) * S - k * 14;
-    el.style.left = `${((f.x + (k % 2 ? 6 : -6)) / W) * 100}%`;
-    el.style.top = `${topPx}px`;
+    if (color) el.style.color = color;
+    el.style.left = `${((f.x + (k - 1) * 11) / W) * 100}%`;
+    el.style.top = `${(groundY - (f.bottom - f.headTop) - 2 - k * 7) * S}px`;
     fx.append(el);
-    setTimeout(() => el.remove(), 950);
+    setTimeout(() => el.remove(), 1000);
+  }
+
+  // ---- effects
+  function sparks(x, y, n, colors, speedMul = 1, gravity = 60) {
+    for (let k = 0; k < n; k++) {
+      const a = rand(0, Math.PI * 2);
+      const v = rand(30, 70) * speedMul;
+      particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 10, g: gravity, color: colors[k % colors.length], life: rand(0.18, 0.35), age: 0, size: 1 });
+    }
+  }
+  function dust(x, y, n = 6) {
+    for (let k = 0; k < n; k++) {
+      particles.push({ x: x + rand(-6, 6), y, vx: rand(-25, 25), vy: rand(-18, -4), g: 30, color: k % 2 ? '#d8c9a8' : '#a8977a', life: rand(0.3, 0.5), age: 0, size: 2 });
+    }
+  }
+
+  // Start an attack so its strike lands at `impactRt`.
+  function startAttack(f, impactRt) {
+    const realInterval = f.interval / speed;
+    const dur = Math.max(LEAD + 0.08, Math.min(0.38, realInterval * 0.92));
+    const start = impactRt - LEAD;
+    f.act = { start, dur, ps: LEAD / dur };
+    if (f.style === 'staff' || f.style === 'cast') {
+      const tgt = F[1 - f.i];
+      effects.push({
+        type: 'bolt', start: start + LEAD * 0.35, end: impactRt,
+        x0: f.x + f.face * 12, y0: chestY(f) - (f.mob ? 0 : 6), x1: frontX(tgt), y1: chestY(tgt), color: f.color, light: f.light,
+      });
+    }
+  }
+
+  // Body half-widths facing the other fighter, for melee contact.
+  const half = (f) => (f.mob ? 12 : 8);
+  function reachOf(f) {
+    if (RANGED.has(f.style)) return 2;
+    const tgt = F[1 - f.i];
+    const gap = Math.abs(tgt.x - f.x) - half(f) - half(tgt);
+    return Math.max(4, gap - (CLOSE[f.style] ?? 3));
+  }
+
+  // Offset and pose for a fighter at the current real time.
+  function motion(f) {
+    let dx = 0;
+    let dy = 0;
+    let pose = 'idle';
+    const a = f.act;
+    if (a && !reduced) {
+      const p = (rt - a.start) / a.dur;
+      if (p >= 0 && p < 1) {
+        const ps = a.ps;
+        const reach = reachOf(f);
+        const w = ps * 0.45; // wind-up end
+        const hold = Math.min(1, ps + 0.18);
+        let r;
+        if (p < w) r = -(p / w) * 2.5;
+        else if (p < ps) { const q = (p - w) / (ps - w); r = -2.5 + (reach + 2.5) * q * q; }
+        else if (p < hold) r = reach;
+        else r = reach * (1 - easeOut((p - hold) / (1 - hold)));
+        dx = Math.round(r) * f.face;
+        if (f.style === 'hop') dy = p < ps ? -Math.round(Math.sin((p / ps) * Math.PI) * 9) : 0;
+        if (f.style === 'slam') dy = p < ps ? -Math.round(Math.sin(Math.min(1, p / (ps * 0.8)) * Math.PI * 0.5) * 7 * (p < ps * 0.8 ? 1 : (ps - p) / (ps * 0.2))) : 0;
+        if (p > ps * 0.55 && p < hold + 0.1) pose = 'swing';
+      }
+    }
+    // knockback when hit
+    const kp = rt - f.kickAt;
+    if (kp >= 0 && kp < 0.14) dx -= f.face * (kp < 0.07 ? 3 : 1);
+    return { dx, dy, pose };
+  }
+
+  // Impact of a hit on its target, at the current real time.
+  function impact(e) {
+    const a = F[e.src];
+    const d = F[e.dst];
+    d.flashAt = rt; d.flashColor = 'white';
+    d.kickAt = rt;
+    const hx = frontX(d);
+    const hy = chestY(d) + rand(-3, 2);
+    const big = e.crit || a.style === 'axe' || a.style === 'mace' || a.style === 'slam' || a.style === 'charge';
+    if (!reduced) shake = Math.max(shake, e.crit ? 3 : big ? 2 : 0);
+    const col = e.crit ? ['#ffe08a', '#f58a3a', '#ffffff'] : e.magic ? [a.color, a.light, '#ffffff'] : ['#ffffff', '#f4f1ff', '#ffe08a'];
+    sparks(hx, hy, e.crit ? 14 : 8, col, e.crit ? 1.4 : 1);
+    effects.push({ type: 'slash', style: a.style, start: rt, x: hx, y: hy, face: a.face, color: e.crit ? '#ffe08a' : a.light || '#ffffff', edge: a.color });
+    if (a.style === 'slam' || a.style === 'mace' || a.style === 'axe') dust(d.x, groundY, big ? 8 : 5);
+    const text = e.crit ? `${e.dmg}!` : `${e.dmg}`;
+    floatNum(e.dst, text, e.crit ? 'crit' : e.magic ? 'magic' : '');
+    const bar = app.querySelector(`#hp${e.dst}`);
+    bar.classList.remove('hit'); void bar.offsetWidth; bar.classList.add('hit');
   }
 
   function handle(e, visual) {
     if (e.type === 'hit') {
-      const a = F[e.src], d = F[e.dst];
-      if (visual) {
-        a.lungeAt = rt;
-        d.hitAt = rt + 0.06;
-        floatNum(e.dst, e.crit ? `${e.dmg}!` : `${e.dmg}`, e.crit ? 'crit' : e.magic ? 'magic' : '');
-        if (e.crit) { arena.classList.remove('shake'); void arena.offsetWidth; arena.classList.add('shake'); }
-      }
-      const abs = e.absorbed ? ` <span style="color:#7fd8e8">(${e.absorbed} shielded)</span>` : '';
-      log(`${names[e.src]} hits for <b>${e.dmg}</b>${e.crit ? ' — crit!' : ''}${abs}`, e.crit ? 'c-crit' : '');
+      if (visual) impact(e);
+      const abs = e.absorbed ? ` <span style="color:#7fd8e8">(${e.absorbed} blocked)</span>` : '';
+      log(`${names[e.src]} hits <b>${e.dmg}</b>${e.crit ? ' <span class="c-crit">CRIT</span>' : ''}${abs}`);
     } else if (e.type === 'dot') {
-      if (visual) floatNum(e.dst, `${e.dmg}${e.crit ? '!' : ''}`, 'small');
-      if (visual && fx.lastElementChild) fx.lastElementChild.style.color = STATUSES[e.status]?.color || '#aeb4c8';
-      if (e.status === 'thorns') log(`Thorns deal <b>${e.dmg}</b> to ${names[e.dst]}`);
-      if (e.status === 'bleed') log(`${names[e.dst]} bleeds for <b>${e.dmg}</b>`, 'c-status');
+      const color = STATUSES[e.status]?.color || '#aeb4c8';
+      if (visual) {
+        const d = F[e.dst];
+        floatNum(e.dst, `${e.dmg}${e.crit ? '!' : ''}`, 'small', color);
+        d.flashAt = rt; d.flashColor = e.status === 'poison' ? 'green' : 'red';
+        sparks(d.x, chestY(d), 5, [color, '#ffffff'], 0.6, -20);
+      }
+      if (e.status === 'thorns') log(`Thorns hit ${names[e.dst]} for <b>${e.dmg}</b>`);
     } else if (e.type === 'heal') {
-      if (visual && e.amt >= 1) floatNum(e.dst, `+${e.amt}`, 'heal small');
-      if (e.source !== 'Regen' && e.source !== 'Lifesteal') log(`${e.source}: ${names[e.dst]} heals ${e.amt}`, 'c-heal');
+      if (visual && e.amt >= 1) {
+        floatNum(e.dst, `+${e.amt}`, 'heal small');
+        const d = F[e.dst];
+        for (let k = 0; k < 4; k++) particles.push({ x: d.x + rand(-8, 8), y: chestY(d) + rand(-4, 8), vx: 0, vy: -18, g: 0, color: '#8ff06a', life: 0.5, age: rand(-0.2, 0), size: 1, plus: true });
+      }
+      if (e.source !== 'Regen' && e.source !== 'Lifesteal') log(`${e.source} heals ${names[e.dst]} <b class="c-heal">${e.amt}</b>`);
     } else if (e.type === 'status') {
       const meta = STATUSES[e.status];
-      const who = e.src === e.dst ? names[e.dst] : `${names[e.src]} → ${names[e.dst]}`;
-      log(`${who}: <span style="color:${meta.color}">${meta.name}${e.stacks > 1 ? ' ×' + e.stacks : ''}</span>`, 'c-status');
+      if (visual) {
+        const d = F[e.dst];
+        effects.push({ type: 'pop', status: e.status, start: rt, x: d.x, y: groundY - (d.bottom - d.headTop) - 4 });
+      }
+      const who = e.src === e.dst ? names[e.dst] : names[e.dst];
+      log(`${who}: <span style="color:${meta.color}">${meta.name}${e.stacks > 1 ? ' ×' + e.stacks : ''}</span>`);
     } else if (e.type === 'shield') {
-      if (visual) floatNum(e.dst, `+${e.amt}`, 'small');
-      if (visual && fx.lastElementChild) fx.lastElementChild.style.color = '#7fd8e8';
-      log(`${e.source}: ${names[e.dst]} gains ${e.amt} Shield`, 'c-heal');
-    } else if (e.type === 'trigger') {
-      // named in the effect's own line
+      if (visual) {
+        floatNum(e.dst, `+${e.amt}`, 'small', '#7fd8e8');
+        effects.push({ type: 'ring', start: rt, x: F[e.dst].x, y: groundY - 16, color: '#7fd8e8' });
+      }
+      log(`${e.source}: ${names[e.dst]} +${e.amt} Shield`, 'c-heal');
     }
   }
 
+  let prevHp = [null, null];
   function applyFrame(idx) {
     const fr = result.frames[idx];
     fr.forEach((s, i) => {
@@ -154,40 +297,60 @@ export function showBattle(app, run, fight, onDone) {
       const pct = Math.max(0, s.hp / max);
       const hp = app.querySelector(`#hp${i}`);
       hp.querySelector('.fill').style.width = `${pct * 100}%`;
-      hp.querySelector('.lag').style.width = `${pct * 100}%`;
-      hp.querySelector('.shield').style.cssText = s.shield ? `left:${Math.min(pct, 1) * 100}%;width:${Math.min(1 - pct, s.shield / max) * 100}%` : 'width:0';
-      hp.querySelector('.txt').textContent = `${s.hp}/${max}${s.shield ? ` +${s.shield}` : ''}`;
+      if (prevHp[i] === null || s.hp >= prevHp[i]) hp.querySelector('.lag').style.width = `${pct * 100}%`;
+      else setTimeout(() => { hp.querySelector('.lag').style.width = `${pct * 100}%`; }, 250);
+      prevHp[i] = s.hp;
+      hp.querySelector('.shield').style.cssText = s.shield ? `left:${pct * 100}%;width:${Math.min(1 - pct, s.shield / max) * 100}%` : 'width:0';
+      app.querySelector(`#hpn${i}`).textContent = `${s.hp}${s.shield ? `+${s.shield}` : ''}/${max}`;
       hp.classList.toggle('low', pct < 0.3);
       app.querySelector(`#tm${i} .fill`).style.width = `${s.timer * 100}%`;
       const chips = s.statuses.map(statusChip).join('');
       const ce = app.querySelector(`#chips${i}`);
       if (ce._last !== chips) { ce.innerHTML = chips; ce._last = chips; }
-      if (s.hp <= 0 && F[i].deadAt === null) F[i].deadAt = rt;
+      if (s.hp <= 0 && F[i].deadAt === null) die(F[i]);
       F[i].statuses = s.statuses;
     });
   }
 
-  // ---- drawing
-  function drawFighter(f, i) {
-    let dx = 0;
-    const bob = Math.floor(rt * 2 + i) % 2;
-    let img = f.idle;
-    const lp = (rt - f.lungeAt) / 0.28;
-    if (lp >= 0 && lp < 1) {
-      dx += Math.round(Math.sin(lp * Math.PI) * 7) * f.face;
-      if (lp > 0.2 && lp < 0.85) img = f.swing;
+  // KO: three quick flashes, then the sprite bursts into its own pixels.
+  function die(f) {
+    f.deadAt = rt;
+    const img = f.idle.getContext('2d').getImageData(0, 0, f.w, f.h).data;
+    const ox = f.x - f.cx;
+    const oy = groundY - f.bottom;
+    f.burst = [];
+    for (let y = 0; y < f.h; y++) {
+      for (let x = 0; x < f.w; x++) {
+        const o = (y * f.w + x) * 4;
+        if (img[o + 3] === 0 || Math.random() < 0.35) continue;
+        f.burst.push({
+          x: ox + (f.flip ? f.w - 1 - x : x), y: oy + y, vx: rand(-14, 14) + f.face * -12, vy: rand(-40, -8), g: 70,
+          color: `rgb(${img[o]},${img[o + 1]},${img[o + 2]})`, life: rand(0.5, 0.9), age: -((f.h - y) / f.h) * 0.12 - 0.3, size: 1,
+        });
+      }
     }
-    const hp = rt - f.hitAt;
-    const flash = hp >= 0 && hp < 0.1;
-    if (hp >= 0 && hp < 0.12) dx -= 2 * f.face;
-    const x = f.x - f.cx + dx;
-    const y = groundY - f.bottom + (f.deadAt === null ? bob : 0);
+    const winner = F[1 - f.i];
+    if (winner.deadAt === null) winner.winAt = rt + 0.6;
+  }
 
-    // ground shadow
-    ctx.fillStyle = '#1a142355';
-    const sw = f === F[0] || f.flip ? 18 : 22;
-    ctx.fillRect(f.x - sw / 2 + dx, groundY, sw, 2);
-    ctx.fillRect(f.x - sw / 2 + 2 + dx, groundY + 2, sw - 4, 1);
+  // ---- drawing
+  function drawFighter(f) {
+    const intro = Math.min(1, rt / 0.45);
+    const enter = reduced ? 0 : Math.round((1 - easeOut(intro)) * 50) * -f.face;
+    const breathe = f.deadAt === null ? Math.floor(rt * 1.8 + f.i * 0.5) % 2 : 0;
+    const m = motion(f);
+    let dy = m.dy;
+    if (f.winAt !== null && rt > f.winAt && !reduced) dy -= Math.round(Math.abs(Math.sin((rt - f.winAt) * 7)) * 5);
+    const x = f.x - f.cx + m.dx + enter;
+    const y = groundY - f.bottom + breathe + dy;
+
+    // ground shadow shrinks as the fighter leaves the ground
+    if (f.deadAt === null || rt - f.deadAt < 0.3) {
+      const sw = Math.max(8, (f.mob ? 22 : 18) + Math.min(0, dy));
+      ctx.fillStyle = '#1a142366';
+      ctx.fillRect(f.x - sw / 2 + m.dx + enter, groundY, sw, 2);
+      ctx.fillRect(f.x - sw / 2 + 2 + m.dx + enter, groundY + 2, sw - 4, 1);
+    }
 
     const draw = (c, alpha = 1) => {
       ctx.save();
@@ -198,32 +361,32 @@ export function showBattle(app, run, fight, onDone) {
     };
 
     if (f.deadAt !== null) {
-      const p = Math.min(1, (rt - f.deadAt) / 0.7);
-      if (!f.noise) f.noise = Array.from({ length: f.w * f.h }, () => Math.random());
-      const tmp = document.createElement('canvas');
-      tmp.width = f.w; tmp.height = f.h;
-      const tc = tmp.getContext('2d');
-      tc.drawImage(f.idle, 0, 0);
-      tc.fillStyle = '#000';
-      tc.globalCompositeOperation = 'destination-out';
-      for (let j = 0; j < f.noise.length; j++) if (f.noise[j] < p) tc.fillRect(j % f.w, Math.floor(j / f.w), 1, 1);
-      draw(tmp);
+      const dt = rt - f.deadAt;
+      if (dt < 0.3) {
+        draw(f.idle);
+        if (Math.floor(dt / 0.05) % 2 === 0) draw(f.white, 0.95);
+      } else if (!f.burstDone) {
+        particles.push(...f.burst);
+        f.burstDone = true;
+        sparks(f.x, chestY(f), 10, ['#ffffff', '#ffe08a'], 1.2);
+      }
       return;
     }
 
-    draw(img);
+    draw(m.pose === 'swing' ? f.swing : f.idle);
     const st = new Set((f.statuses || []).map((s) => s.id));
-    if (st.has('freeze')) draw(f.blue, 0.65);
-    else if (st.has('chill')) draw(f.blue, 0.3);
-    if (flash) draw(f.white, 0.9);
+    if (st.has('freeze')) draw(f.blue, 0.6);
+    else if (st.has('chill')) draw(f.blue, 0.28);
+    const fl = rt - f.flashAt;
+    if (fl >= 0 && fl < 0.08) draw(f.flashColor === 'white' ? f.white : f.flashColor === 'green' ? f.blue : f.red, f.flashColor === 'white' ? 0.75 : 0.5);
 
-    // overlays
+    // status overlays
     const top = y + f.headTop;
     if (st.has('stun') || st.has('freeze')) {
       for (let k = 0; k < 3; k++) {
-        const a = rt * 5 + (k * Math.PI * 2) / 3;
-        const sx = Math.round(f.x + Math.cos(a) * 8);
-        const sy = Math.round(top - 4 + Math.sin(a) * 2);
+        const ang = rt * 5 + (k * Math.PI * 2) / 3;
+        const sx = Math.round(f.x + m.dx + Math.cos(ang) * 8);
+        const sy = Math.round(top - 5 + Math.sin(ang) * 2);
         ctx.fillStyle = st.has('freeze') ? '#d4f6ff' : '#f2c14e';
         ctx.fillRect(sx, sy - 1, 1, 3);
         ctx.fillRect(sx - 1, sy, 3, 1);
@@ -231,39 +394,149 @@ export function showBattle(app, run, fight, onDone) {
     }
     if (st.has('shield')) {
       ctx.fillStyle = (Math.floor(rt * 6) % 2) ? '#7fd8e8aa' : '#d4f6ffaa';
-      const rx = 17, ry = 20, cy = groundY - 16;
-      for (let a = 0; a < Math.PI * 2; a += 0.12) ctx.fillRect(Math.round(f.x + Math.cos(a) * rx), Math.round(cy + Math.sin(a) * ry), 1, 1);
+      const rx = f.mob ? 18 : 15, ry = f.mob ? 17 : 21, cy = groundY - ry + 2;
+      for (let ang = 0; ang < Math.PI * 2; ang += 0.1) ctx.fillRect(Math.round(f.x + m.dx + Math.cos(ang) * rx), Math.round(cy + Math.sin(ang) * ry), 1, 1);
     }
-    const spawn = (color, vy, life, n = 1, size = 1) => {
-      for (let k = 0; k < n; k++) {
-        particles.push({ x: f.x - 9 + Math.random() * 18, y: groundY - 6 - Math.random() * (f.bottom - f.headTop - 8), vy, color, life, age: 0, size });
+    const spawn = (color, vy, life, size = 1) => particles.push({
+      x: f.x + m.dx + rand(-8, 8), y: groundY - 4 - rand(0, f.bottom - f.headTop - 6), vx: rand(-3, 3), vy, g: 0, color, life, age: 0, size,
+    });
+    if (!reduced && Math.random() < 0.4) {
+      if (st.has('burn')) spawn(Math.random() < 0.5 ? '#f58a3a' : '#f2c14e', -26, 0.45);
+      if (st.has('poison') && Math.random() < 0.6) spawn('#6cc24a', -12, 0.8, 2);
+      if (st.has('bleed') && Math.random() < 0.3) particles.push({ x: f.x + rand(-5, 5), y: chestY(f), vx: 0, vy: 5, g: 90, color: '#d9434f', life: 0.4, age: 0, size: 1 });
+      if (st.has('frenzy')) spawn('#f28bb0', -34, 0.25);
+      if (st.has('weaken') && Math.random() < 0.4) spawn('#9a5cc6', 10, 0.5);
+    }
+  }
+
+  function drawEffects() {
+    for (let k = effects.length - 1; k >= 0; k--) {
+      const e = effects[k];
+      const age = rt - e.start;
+      if (e.type === 'bolt') {
+        if (rt < e.start) continue;
+        const p = Math.min(1, (rt - e.start) / (e.end - e.start));
+        if (p >= 1) { effects.splice(k, 1); continue; }
+        const x = e.x0 + (e.x1 - e.x0) * p;
+        const y = e.y0 + (e.y1 - e.y0) * p - Math.sin(p * Math.PI) * 6;
+        for (let j = 1; j <= 4; j++) {
+          const q = Math.max(0, p - j * 0.06);
+          ctx.fillStyle = e.color;
+          ctx.globalAlpha = 1 - j * 0.22;
+          ctx.fillRect(Math.round(e.x0 + (e.x1 - e.x0) * q), Math.round(e.y0 + (e.y1 - e.y0) * q - Math.sin(q * Math.PI) * 6), 2, 2);
+        }
+        ctx.globalAlpha = 1;
+        const bx = Math.round(x), by = Math.round(y);
+        ctx.fillStyle = '#1a1423';
+        ctx.fillRect(bx - 3, by - 2, 7, 5);
+        ctx.fillRect(bx - 2, by - 3, 5, 7);
+        ctx.fillStyle = e.color;
+        ctx.fillRect(bx - 2, by - 1, 5, 3);
+        ctx.fillRect(bx - 1, by - 2, 3, 5);
+        ctx.fillStyle = e.light || '#ffffff';
+        ctx.fillRect(bx - 1, by - 1, 2, 2);
+      } else if (e.type === 'slash') {
+        if (age > 0.16) { effects.splice(k, 1); continue; }
+        drawSlash(e, age / 0.16);
+      } else if (e.type === 'ring') {
+        if (age > 0.4) { effects.splice(k, 1); continue; }
+        const r = 6 + age * 50;
+        ctx.fillStyle = e.color;
+        ctx.globalAlpha = 1 - age / 0.4;
+        for (let ang = 0; ang < Math.PI * 2; ang += 0.15) ctx.fillRect(Math.round(e.x + Math.cos(ang) * r), Math.round(e.y + Math.sin(ang) * r * 0.9), 1, 1);
+        ctx.globalAlpha = 1;
+      } else if (e.type === 'pop') {
+        if (age > 0.7) { effects.splice(k, 1); continue; }
+        const g = glyphC(e.status);
+        const rise = Math.min(1, age / 0.15);
+        ctx.globalAlpha = age > 0.5 ? 1 - (age - 0.5) / 0.2 : 1;
+        ctx.drawImage(g, Math.round(e.x - g.width / 2), Math.round(e.y - g.height - rise * 5));
+        ctx.globalAlpha = 1;
       }
-    };
-    if (Math.random() < 0.35) {
-      if (st.has('burn')) spawn(Math.random() < 0.5 ? '#f58a3a' : '#f2c14e', -22, 0.5);
-      if (st.has('poison')) spawn('#6cc24a', -10, 0.8, 1, 2);
-      if (st.has('bleed') && Math.random() < 0.4) spawn('#d9434f', 14, 0.4);
-      if (st.has('frenzy')) spawn('#f28bb0', -30, 0.3);
     }
+  }
+
+  // A crescent (swords, axes), a streak (spears), or a star burst (blunt/bodies).
+  function drawSlash(e, p) {
+    const { x, y, face } = e;
+    ctx.fillStyle = e.color;
+    const alpha = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+    ctx.globalAlpha = alpha;
+    if (e.style === 'spear') {
+      const len = Math.round(16 * Math.min(1, p * 2));
+      ctx.fillRect(face > 0 ? x - len : x, y, len, 1);
+      ctx.fillStyle = e.edge;
+      ctx.fillRect(face > 0 ? x - len + 2 : x, y + 1, len - 2, 1);
+    } else if (['sword', 'dagger', 'axe', 'mace'].includes(e.style)) {
+      const big = e.style === 'axe' || e.style === 'mace';
+      const r = big ? 11 : e.style === 'dagger' ? 7 : 9;
+      const span = Math.min(1, p * 2.2);
+      const a0 = -1.3, a1 = -1.3 + 2.6 * span;
+      for (let ang = a0; ang <= a1; ang += 0.08) {
+        const cx = x - face * (r - 3);
+        const px = Math.round(cx + Math.cos(ang) * r * face);
+        const py = Math.round(y + Math.sin(ang) * r);
+        ctx.fillStyle = e.color;
+        ctx.fillRect(px, py, 1, 1);
+        ctx.fillStyle = e.edge;
+        ctx.fillRect(px - face, py, 1, 1);
+        if (big) ctx.fillRect(px - 2 * face, py, 1, 1);
+      }
+    } else if (e.style !== 'staff' && e.style !== 'cast') {
+      const r = Math.round(3 + p * 5);
+      for (let k = 0; k < 8; k++) {
+        const ang = (k * Math.PI) / 4;
+        ctx.fillRect(Math.round(x + Math.cos(ang) * r), Math.round(y + Math.sin(ang) * r), k % 2 ? 1 : 2, k % 2 ? 1 : 2);
+      }
+    } else {
+      const r = Math.round(2 + p * 7);
+      for (let ang = 0; ang < Math.PI * 2; ang += 0.3) ctx.fillRect(Math.round(x + Math.cos(ang) * r), Math.round(y + Math.sin(ang) * r), 1, 1);
+    }
+    ctx.globalAlpha = 1;
   }
 
   function draw(dt) {
+    ctx.save();
     ctx.clearRect(0, 0, W, H);
+    if (shake > 0) {
+      ctx.translate(Math.round(rand(-shake, shake)), Math.round(rand(-shake * 0.6, shake * 0.6)));
+      shake = Math.max(0, shake - dt * 18);
+    }
     ctx.drawImage(bg, 0, 0);
-    F.forEach(drawFighter);
+    // the fighter currently attacking draws on top
+    const order = [...F].sort((a, b) => (a.act?.start ?? -1) - (b.act?.start ?? -1));
+    order.forEach(drawFighter);
+    drawEffects();
     for (let k = particles.length - 1; k >= 0; k--) {
       const p = particles[k];
       p.age += dt;
-      p.y += p.vy * dt;
+      if (p.age < 0) continue;
       if (p.age > p.life) { particles.splice(k, 1); continue; }
+      p.vy += (p.g || 0) * dt;
+      p.x += (p.vx || 0) * dt;
+      p.y += p.vy * dt;
+      ctx.globalAlpha = p.age > p.life * 0.6 ? 0.5 : 1;
       ctx.fillStyle = p.color;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+      if (p.plus) { ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y), 3, 1); ctx.fillRect(Math.round(p.x), Math.round(p.y) - 1, 1, 3); }
+      else ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
     }
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
+  // Start wind-ups for hits that land within LEAD of now.
+  function lookahead() {
+    const horizon = Math.floor((t + LEAD * speed) * TPS);
+    while (animIdx < result.events.length && result.events[animIdx].t <= horizon) {
+      const e = result.events[animIdx++];
+      if (e.type !== 'hit') continue;
+      const impactRt = rt + (e.t / TPS - t) / speed;
+      startAttack(F[e.src], impactRt);
+    }
+  }
   function processTo(idx, visual) {
-    while (evIdx < result.events.length && result.events[evIdx].t <= idx) {
-      const e = result.events[evIdx++];
+    while (applyIdx < result.events.length && result.events[applyIdx].t <= idx) {
+      const e = result.events[applyIdx++];
       if (e.type !== 'end') handle(e, visual);
     }
   }
@@ -278,16 +551,22 @@ export function showBattle(app, run, fight, onDone) {
     const reason = result.reason === 'time' ? ' · time up, higher HP% wins' : '';
     const ban = document.createElement('div');
     ban.className = 'banner';
-    ban.innerHTML = `<div style="text-align:center"><div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}</div></div>`;
+    ban.innerHTML = `<div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}</div>`;
     arena.append(ban);
-    log(`<b>${title}</b> after ${secs}s`);
     const why = document.createElement('div');
     why.className = 'why panel';
     why.innerHTML = whyHtml(result, names);
-    app.querySelector('.fighters').after(why);
+    logEl.replaceWith(why);
     app.querySelector('#acts').innerHTML = `<button class="btn go" id="cont">Continue ▸</button>`;
     app.querySelector('#cont').onclick = () => { stop = true; onDone(); };
   }
+
+  // "FIGHT!" callout
+  const call = document.createElement('div');
+  call.className = 'callout';
+  call.textContent = duel ? 'DUEL!' : 'FIGHT!';
+  arena.append(call);
+  setTimeout(() => call.remove(), 1100);
 
   let stop = false;
   function loop(now) {
@@ -295,14 +574,15 @@ export function showBattle(app, run, fight, onDone) {
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     rt += dt;
-    if (!done) {
+    if (!done && rt > INTRO) {
       t += dt * speed;
       const idx = Math.min(lastTick, Math.floor(t * TPS));
+      lookahead();
       processTo(idx, true);
       applyFrame(idx);
       if (idx >= lastTick) {
-        if (finishedAt === null) finishedAt = t;
-        if (t - finishedAt > 0.9 * speed) finish();
+        if (finishedAt === null) finishedAt = rt;
+        if (rt - finishedAt > 1.1) finish();
       }
     }
     draw(dt);
@@ -314,11 +594,12 @@ export function showBattle(app, run, fight, onDone) {
     if (!b) return;
     const v = b.dataset.speed;
     if (v === 'skip') {
-      speed = 1;
       processTo(lastTick, false);
+      animIdx = result.events.length;
       t = lastTick / TPS;
+      rt = Math.max(rt, INTRO + 0.5);
       applyFrame(lastTick);
-      F.forEach((f, i) => { if (result.frames[lastTick][i].hp <= 0) f.deadAt = rt - 1; });
+      F.forEach((f) => { f.act = null; if (f.deadAt !== null) { f.deadAt = rt - 0.31; } });
       finish();
       return;
     }
@@ -330,6 +611,8 @@ export function showBattle(app, run, fight, onDone) {
   processTo(0, true);
   requestAnimationFrame(loop);
 }
+
+const easeOut = (x) => 1 - (1 - x) * (1 - x);
 
 // Damage by source for both sides, as bars.
 function whyHtml(result, names) {
@@ -349,6 +632,6 @@ function whyHtml(result, names) {
       <div class="bar2"><span style="width:${(v / max) * 100}%;background:${SOURCE_COLOR[k] || '#aeb4c8'}"></span></div>
       <span class="n">${v}</span></div>`).join('');
     const heal = heals[i] ? ` · healed ${heals[i]}` : '';
-    return `<div><b>${names[i]}</b> <span class="sub">dealt ${total}${heal}</span></div>${rows}`;
+    return `<div class="whohead"><b>${names[i]}</b> <span class="sub">dealt ${total}${heal}</span></div>${rows}`;
   }).join('');
 }
