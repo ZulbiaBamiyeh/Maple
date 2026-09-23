@@ -1,6 +1,6 @@
 // Shared UI pieces: sprite images, item tiles, the HUD, the bottom sheet, toasts.
 
-import { gridToCanvas } from '../art/pixel.js';
+import { gridToCanvas, silhouette } from '../art/pixel.js';
 import { heroGrid, HERO_W, HERO_H } from '../art/hero.js';
 import { iconGrid, ICON_SIZE } from '../art/icons.js';
 import { mobGrid, MOB_SIZE } from '../art/mobs.js';
@@ -22,9 +22,12 @@ export const equipIds = (equip) => {
 };
 const lookKey = (l) => [l.gender, l.hair, l.hairColor, l.skin, l.eyes].join(',');
 
-export function heroImg(look, equip, scale = 4, { flip = false, cls = 'hero' } = {}) {
-  const ids = equipIds(equip);
-  const src = dataUrl('h' + lookKey(look) + JSON.stringify(ids), () => heroGrid(look, ids, 'idle'));
+// shadow: draw only the bare body's outline, for a rival whose build is hidden.
+export function heroImg(look, equip, scale = 4, { flip = false, cls = 'hero', shadow = false } = {}) {
+  const ids = shadow ? {} : equipIds(equip);
+  const src = shadow
+    ? dataUrl('s' + lookKey(look), () => silhouette(heroGrid(look, {}, 'idle'), '#0f0b16'))
+    : dataUrl('h' + lookKey(look) + JSON.stringify(ids), () => heroGrid(look, ids, 'idle'));
   return `<img class="px ${cls}" src="${src}" width="${HERO_W * scale}" height="${HERO_H * scale}" style="${flip ? 'transform:scaleX(-1)' : ''}" alt="">`;
 }
 export function iconImg(itemId, scale = 2) {

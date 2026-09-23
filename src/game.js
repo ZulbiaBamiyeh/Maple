@@ -149,7 +149,6 @@ export class Run {
     return score / n;
   }
   mobOdds(mobId, equip) { return this.odds(mobFighter(mobId, this.round), equip); }
-  duelOdds(equip) { return this.odds(this.ghostFighter(), equip); }
 
   // Run the fight for this round. target: mob id for hunts, ignored for duels.
   fight(mobId) {

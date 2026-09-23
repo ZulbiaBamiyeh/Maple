@@ -59,10 +59,6 @@ function later(fn) {
   requestAnimationFrame(() => setTimeout(fn, 0));
 }
 
-// True in a duel round before the duel has been fought.
-function duelPending(run) {
-  return run.isDuel && run.ghost && !run.history.some((h) => h.round === run.round);
-}
 
 // ---------------------------------------------------------------- first-time popups
 
@@ -77,9 +73,9 @@ const INTRO = {
   hub: ['Your gear', `
     <p><b>DPS</b> is your damage per second. <b>EHP</b> is how much you can take, counting Def.</p>
     <p>Tap any item to swap it, scrap it, or spend gold on <b>scrolls</b> to upgrade it. Two pieces from one monster family unlock a set bonus.</p>`],
-  duel: ['Duel!', `
-    <p>You can see your rival's gear. Theirs is locked in; yours isn't.</p>
-    <p>Tap bag items to see how swapping changes <b>your odds</b>. Poison and burn ignore Def; heavy weapons punch through it.</p>`],
+  duelBlind: ['Duel!', `
+    <p>You face another player's saved build. You won't see it until the fight starts.</p>
+    <p>Go in with your strongest all-round gear. Win and you loot from their build; lose and you'll know what beat you.</p>`],
 };
 const intro = (key) => firstTime(key, ...INTRO[key]);
 
@@ -187,22 +183,20 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
   const on = new Set(activeSets(run.equip));
   const slotTile = (slot, label) => tile(run.equip[slot], { size: 2, attrs: `data-slot="${slot}"`, label });
 
+  // A duel rival's build stays hidden until the fight starts, like a ghost
+  // board in The Bazaar: you prepare for the field, not for one opponent.
   let foeHtml = '';
   if (mode === 'duel') {
     const gh = run.ghost;
-    const gf = run.ghostFighter();
-    const gh2 = headline(gf);
     foeHtml = `
       <div class="foe panel">
-        <div class="foe-stage" data-stage="duel,0.88,2">${heroImg(gh.look, gh.equip, 2, { flip: true })}</div>
+        <div class="foe-stage" data-stage="duel,0.88,2">${heroImg(gh.look, null, 2, { flip: true, shadow: true })}<span class="mystery">?</span></div>
         <div class="foe-info">
+          <div class="kicker">DUEL · ROUND ${run.round}</div>
           <div class="name">${gh.name} <span class="chip trait">${gh.record}</span></div>
-          <div class="sub">${gh.archetype}${gh.mine ? ' · <span style="color:var(--gold)">your past build</span>' : ''}</div>
-          <div class="cmp"><span>DPS <b>${gh2.dps}</b></span><span>EHP <b>${gh2.ehp}</b></span><span>Def <b>${gf.def}</b></span><span>Res <b>${fmtPct(gf.resist)}</b></span></div>
-          <div class="slots">${['weapon', 'hat', 'top', 'gloves', 'shoes', 'trinket1', 'trinket2'].map((s) => gh.equip[s] ? tile(gh.equip[s], { size: 1.3, attrs: `data-foe="${s}"` }) : '').join('')}</div>
+          <div class="sub">${gh.mine ? 'One of your past builds. ' : ''}Build hidden until the fight.</div>
         </div>
-      </div>
-      <div class="vs" id="duel-odds"><span class="odds-chip o0">Your odds: …</span></div>`;
+      </div>`;
   }
 
   const setChips = Object.entries(counts).map(([fam, n]) => {
@@ -256,18 +250,13 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
   app.querySelectorAll('[data-bag]').forEach((el) => {
     el.onclick = () => itemSheet(ctx, run.find(el.dataset.bag), { from: 'bag' });
   });
-  app.querySelectorAll('[data-foe]').forEach((el) => {
-    el.onclick = () => itemSheet(ctx, run.ghost.equip[el.dataset.foe], { from: 'foe' });
-  });
   app.querySelector('#primary').onclick = () => {
     if (mode === 'duel') ctx.duel();
     else if (mode === 'view') ctx.go('pick');
     else ctx.nextRound();
   };
-  if (mode === 'duel') {
-    later(() => { const el = app.querySelector('#duel-odds'); if (el) el.innerHTML = oddsChip(run.duelOdds(), 'Your odds: '); });
-    intro('duel');
-  } else if (mode === 'hub') intro('hub');
+  if (mode === 'duel') intro('duelBlind');
+  else if (mode === 'hub') intro('hub');
 }
 
 // ---------------------------------------------------------------- loot
@@ -360,11 +349,6 @@ export function itemSheet(ctx, inst, where) {
       <div><div class="k">DPS</div><div class="v">${delta(before.dps, after.dps)}</div></div>
       <div><div class="k">EHP</div><div class="v">${delta(before.ehp, after.ehp)}</div></div>
     </div>${cur ? `<div class="vsline">vs your ${itemName(cur)}</div>` : ''}`;
-    if (where.from === 'bag' && duelPending(run)) {
-      const a = run.duelOdds();
-      const b = run.duelOdds(run.withItem(inst, targetSlots[0]));
-      cmp += `<div class="duelcmp">vs ${run.ghost.name}: ${oddsChip(a)} → ${oddsChip(b)}</div>`;
-    }
   } else if (where.from === 'equip') {
     const after = run.headline({ ...run.equip, [where.slot]: null });
     cmp = `<div class="cmpbox">
@@ -510,7 +494,7 @@ export function helpSheet() {
     <div class="help">
       <p><b>The run.</b> 9 rounds, 3 lives. Rounds 3, 6 and 9 are duels against another player's saved build. Win round 9 for a Crown.</p>
       <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear and pay more gold. A loss costs a life.</p>
-      <p><b>Duels.</b> You see the rival's gear first. Swap items in from your bag to counter them; the odds update as you do.</p>
+      <p><b>Duels.</b> Rounds 3, 6 and 9 pit you against another player's saved build, hidden until the fight starts. Build for all-round strength; win to loot from their gear.</p>
       <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
       <p><b>Scrolls.</b> Every item has 3 upgrade slots. Sure: 100%, +1. Chancy: 60%, +3. Long-shot: 10%, +8. A slot is used either way.</p>
       <h3>Stats</h3>

@@ -443,3 +443,12 @@ h2 { font-size: 20px; line-height: 1.1; }
 /* Primary actions always sit at the bottom, in thumb reach. */
 .screen > .actions:last-child { margin-top: auto; }
 .title-wrap .btn { white-space: nowrap; font-size: 16px; padding: 0 12px; }
+
+/* Hidden duel rival */
+.foe-stage .mystery {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1;
+  font-size: 30px; font-weight: 700; color: var(--gold);
+  text-shadow: 2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink);
+  animation: bob 1s steps(1) infinite;
+}
+.foe .kicker { font-family: var(--num); font-size: 10px; color: var(--gold); letter-spacing: 1px; }
