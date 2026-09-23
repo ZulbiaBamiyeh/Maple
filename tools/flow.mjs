@@ -16,11 +16,24 @@ const server = http.createServer((req, res) => {
 const out = process.argv[2] || '.';
 const seed = process.argv[3] || '42';
 const browser = await chromium.launch();
-const pg = await (await browser.newContext({ viewport: { width: +(process.env.VW || 390), height: 780 } })).newPage();
+const pg = await (await browser.newContext({ viewport: { width: +(process.env.VW || 390), height: +(process.env.VH || 844) } })).newPage();
 pg.on('pageerror', (e) => console.log('[pageerror]', e.message));
 pg.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('ERR_CERT')) console.log('[console]', m.text()); });
 await pg.goto(`http://localhost:${server.address().port}/index.html?seed=${seed}`);
 await pg.waitForTimeout(400);
+// First-time popups cover the screen; photograph the first one, then dismiss any before tapping.
+let popups = 0;
+const realClick = pg.click.bind(pg);
+pg.click = async (sel) => {
+  await pg.waitForTimeout(420);
+  const ok = await pg.$('#modal-ok');
+  if (ok) {
+    if (!popups++) await pg.screenshot({ path: path.join(out, '00-popup.png') });
+    await ok.click();
+    await pg.waitForTimeout(100);
+  }
+  return realClick(sel);
+};
 const shot = async (n, full = !process.env.NOFULL) => { await pg.screenshot({ path: path.join(out, n + '.png'), fullPage: full }); console.log('shot', n); };
 await pg.click('#start');
 await pg.waitForTimeout(300);

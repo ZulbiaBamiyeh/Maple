@@ -71,7 +71,9 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   const cw = arena.clientWidth || 360;
   const S = cw >= 300 ? 3 : 2;
   const W = Math.floor(cw / S);
-  const H = Math.max(104, Math.min(136, Math.floor((window.innerHeight * 0.46) / S)));
+  // Fill the height left after the HUD, the log/result area and the buttons.
+  const free = app.clientHeight - app.querySelector('.hud').offsetHeight - 128 - 56 - 24;
+  const H = Math.max(90, Math.min(150, Math.floor(free / S)));
   const groundY = H - 16;
   canvas.width = W;
   canvas.height = H;
@@ -632,7 +634,7 @@ function whyHtml(result, names) {
   const max = Math.max(1, ...dealt.flatMap((d) => Object.values(d)));
   return [0, 1].map((i) => {
     const total = Object.values(dealt[i]).reduce((s, v) => s + v, 0);
-    const rows = Object.entries(dealt[i]).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `
+    const rows = Object.entries(dealt[i]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `
       <div class="row"><span>${k === 'Hits' || k === 'Crits' ? k : STATUSES[k]?.name || 'Thorns'}</span>
       <div class="bar2"><span style="width:${(v / max) * 100}%;background:${SOURCE_COLOR[k] || '#aeb4c8'}"></span></div>
       <span class="n">${v}</span></div>`).join('');

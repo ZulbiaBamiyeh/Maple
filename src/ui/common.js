@@ -33,7 +33,7 @@ export function iconImg(itemId, scale = 2) {
 }
 export function mobImg(sprite, scale = 3) {
   const src = dataUrl('m' + sprite, () => mobGrid(sprite));
-  return `<img class="px" src="${src}" width="${MOB_SIZE * scale}" height="${MOB_SIZE * scale}" alt="">`;
+  return `<img class="px mob" src="${src}" width="${MOB_SIZE * scale}" height="${MOB_SIZE * scale}" alt="">`;
 }
 export function glyph(name, scale = 2) {
   const g = glyphGrid(name);
@@ -144,15 +144,24 @@ export function oddsChip(p, prefix = '') {
   return `<span class="odds-chip ${b.cls}">${prefix}<span class="pips5">${pips}</span>${b.label}</span>`;
 }
 
-// ---------------------------------------------------------------- tips
+// ---------------------------------------------------------------- first-time popups
 
-// A one-time hint card. Dismissed tips never come back (per device).
-export function tip(key, html) {
-  if (tipSeen(key)) return '';
-  return `<div class="tip" data-tip="${key}"><div>${html}</div><button class="tip-x" aria-label="Got it">Got it</button></div>`;
-}
-export function bindTips(root) {
-  root.querySelectorAll('[data-tip]').forEach((el) => {
-    el.querySelector('.tip-x').onclick = () => { markTip(el.dataset.tip); el.remove(); };
-  });
+// A short centred popup shown the first time a screen appears (per device).
+// It waits a beat so the screen underneath is visible first.
+export function firstTime(key, title, body) {
+  if (tipSeen(key)) return;
+  markTip(key);
+  setTimeout(() => {
+    const root = document.getElementById('sheet-root');
+    if (root.children.length) return; // something else is open; skip quietly
+    root.innerHTML = `<div class="scrim"></div>
+      <div class="modal" role="dialog" aria-labelledby="modal-t">
+        <h2 id="modal-t">${title}</h2>
+        <div class="modal-body">${body}</div>
+        <button class="btn primary" id="modal-ok">Got it</button>
+      </div>`;
+    const close = () => { root.innerHTML = ''; };
+    root.querySelector('#modal-ok').onclick = close;
+    root.querySelector('.scrim').onclick = close;
+  }, 350);
 }
