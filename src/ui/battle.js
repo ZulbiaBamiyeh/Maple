@@ -35,14 +35,16 @@ function glyphC(status) {
   return glyphCanvas.get(k);
 }
 
-export function showBattle(app, run, fight, onDone) {
+export function showBattle(app, run, fight, onDone, { before = null, out = null, speed: startSpeed = 1, onSpeed } = {}) {
   const { result, me, foe, duel, mobId } = fight;
   const biome = duel ? 'duel' : MOBS[mobId].family;
   const names = [me.name, foe.name];
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+  // The result is already applied to the run; the HUD shows the state from before.
+  const hudRun = before ? Object.assign(Object.create(run), before) : run;
   app.innerHTML = `
-    ${hud(run)}
+    ${hud(hudRun)}
     <section class="screen battle">
       <div class="arena" id="arena">
         <canvas id="arena-c"></canvas>
@@ -57,8 +59,8 @@ export function showBattle(app, run, fight, onDone) {
       </div>
       <div class="log" id="log"></div>
       <div class="actions sticky" id="acts">
-        <button class="btn small on" data-speed="1">1×</button>
-        <button class="btn small" data-speed="2">2×</button>
+        <button class="btn small ${startSpeed === 1 ? 'on' : ''}" data-speed="1">1×</button>
+        <button class="btn small ${startSpeed === 2 ? 'on' : ''}" data-speed="2">2×</button>
         <button class="btn small" data-speed="skip">Skip ▸▸</button>
       </div>
     </section>`;
@@ -123,7 +125,7 @@ export function showBattle(app, run, fight, onDone) {
   F[1].interval = foe.weapon.interval / Math.max(0.25, 1 + foe.haste);
 
   // ---- playback state
-  let speed = 1;
+  let speed = startSpeed === 2 ? 2 : 1;
   let t = 0; // fight seconds
   let rt = 0; // real seconds; drives every animation
   let applyIdx = 0;
@@ -545,13 +547,15 @@ export function showBattle(app, run, fight, onDone) {
     if (done) return;
     done = true;
     const w = result.winner;
-    const title = w === 0 ? 'Victory!' : w === 1 ? 'Defeat' : 'Draw';
+    const title = w === 0 ? (run.crown && duel ? 'Crowned!' : 'Victory!') : w === 1 ? 'Defeat' : 'Draw';
     const cls = w === 0 ? 'win' : w === 1 ? 'loss' : 'draw';
     const secs = (result.ticks / TPS).toFixed(1);
     const reason = result.reason === 'time' ? ' · time up, higher HP% wins' : '';
+    const pay = out?.gold ? ` · <span style="color:var(--gold)">+${out.gold} gold</span>` : '';
+    const life = out?.lifeLost ? ' · <span style="color:#ff6b76">−1 life</span>' : '';
     const ban = document.createElement('div');
     ban.className = 'banner';
-    ban.innerHTML = `<div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}</div>`;
+    ban.innerHTML = `<div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}${pay}${life}</div>`;
     arena.append(ban);
     const why = document.createElement('div');
     why.className = 'why panel';
@@ -604,6 +608,7 @@ export function showBattle(app, run, fight, onDone) {
       return;
     }
     speed = +v;
+    onSpeed?.(speed);
     app.querySelectorAll('[data-speed]').forEach((x) => x.classList.toggle('on', x === b));
   });
 

@@ -3,7 +3,7 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, SCROLLS, slotKind,
+  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, SCROLLS, GOLD_WIN, GOLD_LOSS, slotKind,
 } from './data.js';
 import {
   rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot, scrapValue, applyScroll,
@@ -29,6 +29,25 @@ export function randomLook(rng) {
 
 export const isDuel = (round) => DUEL_ROUNDS.includes(round);
 
+// Builds saved from earlier runs on this device, fought alongside the
+// hand-written ghosts. main.js fills this from storage at startup.
+export const savedGhosts = [];
+
+// A label like "Poison dagger" or "Sword" from what a build wears.
+export function archetypeOf(equip) {
+  const w = equip.weapon ? ITEMS[equip.weapon.item] : null;
+  const type = w ? w.type : 'fists';
+  const fams = {};
+  for (const inst of Object.values(equip)) {
+    const f = inst && ITEMS[inst.item].family;
+    if (f) fams[f] = (fams[f] || 0) + 1;
+  }
+  const top = Object.entries(fams).sort((a, b) => b[1] - a[1])[0];
+  const flavor = top && top[1] >= 2 ? { slime: 'Gel', spore: 'Poison', boar: 'Bleed', wisp: 'Frost', golem: 'Stone', imp: 'Ember' }[top[0]] : null;
+  const name = type[0].toUpperCase() + type.slice(1);
+  return flavor ? `${flavor} ${type}` : name;
+}
+
 export class Run {
   constructor(seed = Math.floor(Math.random() * 1e9), look = null) {
     this.seed = seed;
@@ -50,7 +69,23 @@ export class Run {
     this.ghost = null;
     this.loot = null;
     this.lastFight = null;
+    this.stats = { dealt: 0, taken: 0, crits: 0, bestHit: 0, healed: 0 };
     this.rollRound();
+  }
+
+  // ---- save / restore (everything except the replay of the last fight)
+
+  toJSON() {
+    const { rng, lastFight, ...rest } = this;
+    return { v: 1, ...rest };
+  }
+
+  static fromJSON(data) {
+    if (!data || data.v !== 1) return null;
+    const run = Object.create(Run.prototype);
+    const { v, ...rest } = data;
+    Object.assign(run, rest, { rng: new Rng(hash(data.seed, 'run', data.round)), lastFight: null });
+    return run;
   }
 
   get name() { return this.look.name; }
@@ -72,7 +107,9 @@ export class Run {
     const r = new Rng(hash(this.seed, this.round, 'offers'));
     if (this.isDuel) {
       const pool = GHOSTS.filter((g) => g.round === this.round);
-      const gh = r.pick(pool);
+      // Past builds of yours from this round, when there are any, show up half the time.
+      const mine = savedGhosts.filter((g) => g.round === this.round && g.runSeed !== this.seed);
+      const gh = mine.length && r.chance(0.5) ? r.pick(mine) : r.pick(pool);
       this.ghost = {
         ...gh,
         equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round) : null])),
@@ -84,9 +121,35 @@ export class Run {
     }
   }
 
+  // This build as a ghost for future runs: look, record and item rolls.
+  snapshot() {
+    const equip = {};
+    for (const [s, inst] of Object.entries(this.equip)) {
+      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes, upgrades: { ...inst.upgrades }, glow: inst.glow };
+    }
+    return {
+      id: `me-${this.seed}-${this.round}`, name: `Ghost ${this.name}`, record: this.record, round: this.round,
+      archetype: archetypeOf(this.equip), look: this.look, equip, mine: true, runSeed: this.seed,
+    };
+  }
+
   ghostFighter() {
     return heroFighter({ name: this.ghost.name, round: this.round, look: this.ghost.look, equip: this.ghost.equip });
   }
+
+  // Estimated chance to win against a fighter spec, from a handful of practice
+  // fights on seeds the real fight never uses. Draws count as half.
+  odds(foe, equip = this.equip, n = 24) {
+    const me = this.fighter(equip);
+    let score = 0;
+    for (let k = 0; k < n; k++) {
+      const w = simulate(me, foe, hash(this.seed, this.round, 'preview', k)).winner;
+      score += w === 0 ? 1 : w === -1 ? 0.5 : 0;
+    }
+    return score / n;
+  }
+  mobOdds(mobId, equip) { return this.odds(mobFighter(mobId, this.round), equip); }
+  duelOdds(equip) { return this.odds(this.ghostFighter(), equip); }
 
   // Run the fight for this round. target: mob id for hunts, ignored for duels.
   fight(mobId) {
@@ -105,8 +168,11 @@ export class Run {
     const draw = result.winner === -1;
     const out = { won, draw, lifeLost: false, gold: 0 };
     const label = duel ? this.ghost.name : MOBS[mobId].name;
+    this.tally(result);
     if (won) {
       this.wins++;
+      out.gold = GOLD_WIN[duel ? 'duel' : MOBS[mobId].tier];
+      this.gold += out.gold;
       const lr = new Rng(hash(this.seed, this.round, 'loot'));
       if (duel) {
         const pool = [...new Set(Object.values(this.ghost.equip).filter(Boolean).map((i) => i.item))];
@@ -120,9 +186,9 @@ export class Run {
     } else if (!draw) {
       this.losses++;
       this.lives--;
-      this.gold += 2;
+      this.gold += GOLD_LOSS;
       out.lifeLost = true;
-      out.gold = 2;
+      out.gold = GOLD_LOSS;
       this.loot = null;
     } else {
       this.loot = null;
@@ -130,6 +196,20 @@ export class Run {
     this.history.push({ round: this.round, duel, label, result: won ? 'W' : draw ? 'D' : 'L' });
     if (this.lives <= 0 || (this.round === ROUNDS && !this.loot)) this.over = true;
     return out;
+  }
+
+  // Lifetime numbers for the end screen.
+  tally(result) {
+    const st = this.stats;
+    for (const e of result.events) {
+      if (e.type === 'hit' && e.src === 0) {
+        st.dealt += e.dmg;
+        if (e.crit) st.crits++;
+        st.bestHit = Math.max(st.bestHit, e.dmg);
+      } else if (e.type === 'hit' && e.src === 1) st.taken += e.dmg;
+      else if (e.type === 'dot') { if (e.dst === 1) st.dealt += e.dmg; else st.taken += e.dmg; }
+      else if (e.type === 'heal' && e.dst === 0) st.healed += e.amt;
+    }
   }
 
   // ---- inventory

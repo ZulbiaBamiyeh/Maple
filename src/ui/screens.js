@@ -9,8 +9,9 @@ import { statLines, scrapValue, setCounts, activeSets, headline } from '../items
 import { drawScene } from '../art/scenes.js';
 import {
   hud, heroImg, iconImg, mobImg, glyph, statusGlyph, tile, itemName, slotName, cap,
-  openSheet, closeSheet, toast, delta,
+  openSheet, closeSheet, toast, delta, oddsChip, tip, bindTips,
 } from './common.js';
+import { resetTips } from './store.js';
 
 // ---------------------------------------------------------------- backdrops
 
@@ -36,28 +37,43 @@ const fmtPct = (v) => `${Math.round(v * 100)}%`;
 // ---------------------------------------------------------------- title
 
 export function titleScreen(app, ctx) {
-  const look = ctx.titleLook;
+  const sv = ctx.saved;
+  const look = sv ? sv.run.look : ctx.titleLook;
+  const equip = sv ? sv.run.equip : ctx.starterEquip;
   const S = dollScale();
   app.innerHTML = `
     <section class="screen title-wrap">
       <div class="logo">GEARFALL</div>
       <div class="tagline">Pick your hunt. Wear what drops. Duel other players' builds.</div>
-      <div class="stage panel" data-scene="slime,${S},0.86">${heroImg(look, ctx.starterEquip, S)}</div>
-      <div class="nameplate">${glyph(look.gender === 'girl' ? 'heart' : 'swords', 2)} ${look.name}</div>
+      <div class="stage panel" data-scene="slime,${S},0.86">${heroImg(look, equip, S)}</div>
+      <div class="nameplate">${glyph(look.gender === 'girl' ? 'heart' : 'swords', 2)} ${look.name}${sv ? ` <span class="num" style="font-size:12px;color:var(--muted)">${sv.run.record}</span>` : ''}</div>
       <div class="howto panel">
         <div>${glyph('paw', 2)} <b>Hunt</b> — pick 1 of 3 monsters. Each shows what it drops.</div>
         <div>${glyph('coin', 2)} <b>Loot</b> — keep 1 of 3 drops. Equip it, bag it or scrap it.</div>
         <div>${glyph('swords', 2)} <b>Duel</b> — every 3rd round, see a rival's gear and counter it.</div>
         <div>${glyph('crown', 2)} <b>9 rounds, 3 lives.</b> Win the last duel for a Crown.</div>
       </div>
-      <div class="actions" style="width:100%">
-        <button class="btn" id="reroll">New look</button>
-        <button class="btn primary" id="start">Start run ▸</button>
+      ${ctx.best?.runs ? `<div class="sub num" style="font-size:11px">${bestLine(ctx.best)}</div>` : ''}
+      <div class="actions" style="width:100%;flex-wrap:wrap">
+        ${ctx.saved ? `<button class="btn go" id="continue" style="flex-basis:100%">Continue ${ctx.saved.name} · Round ${ctx.saved.round} ▸</button>` : ''}
+        ${sv ? '' : '<button class="btn" id="reroll">New look</button>'}
+        <button class="btn ${ctx.saved ? '' : 'primary'}" id="start">${ctx.saved ? 'New run' : 'Start run ▸'}</button>
       </div>
     </section>`;
   mountScenes(app);
-  app.querySelector('#reroll').onclick = ctx.rerollLook;
-  app.querySelector('#start').onclick = ctx.startRun;
+  app.querySelector('#reroll')?.addEventListener('click', ctx.rerollLook);
+  const start = app.querySelector('#start');
+  start.onclick = () => {
+    // Starting over discards the saved run, so ask with a second tap.
+    if (ctx.saved && !start.dataset.armed) {
+      start.dataset.armed = '1';
+      start.textContent = 'Tap again to abandon saved run';
+      start.classList.add('danger');
+      return;
+    }
+    ctx.startRun();
+  };
+  app.querySelector('#continue')?.addEventListener('click', ctx.continueRun);
 }
 
 // ---------------------------------------------------------------- hunt pick
@@ -75,6 +91,7 @@ export function pickScreen(app, ctx) {
       <div class="portrait" data-scene="${m.family},3,0.84">${mobImg(m.sprite, 3)}</div>
       <div class="info">
         <div class="name">${m.name} <span class="chip tier-${m.tier}">${cap(m.tier)}</span></div>
+        <div class="oddsline" data-odds="${id}"><span class="odds-chip o0">Sizing up…</span></div>
         <div class="line">HP ${Math.round(m.hp * sc)} · Hit ${Math.round(m.min * sc)}–${Math.round(m.max * sc)} · ${m.interval}s${m.def ? ` · Def ${m.def}` : ''}</div>
         <div><span class="chip trait">${traitGlyph} ${m.trait}</span></div>
         <div class="drops">${m.drops.map((d) => iconImg(d, 1.5)).join('')}</div>
@@ -89,6 +106,7 @@ export function pickScreen(app, ctx) {
     ${hud(run)}
     <section class="screen">
       <div><h2>Choose your hunt</h2><div class="sub">Tougher mobs drop rarer gear. Losing costs a life.</div></div>
+      ${tip('pick', `Each card shows the monster's drops and your <b>odds</b> against it with your current gear. Elite hunts are a gamble with a big payout.`)}
       ${cards}
       <div class="grow"></div>
       <div class="actions sticky">
@@ -98,7 +116,12 @@ export function pickScreen(app, ctx) {
       </div>
     </section>`;
   mountScenes(app);
+  bindTips(app);
   app.querySelectorAll('[data-mob]').forEach((el) => { el.onclick = () => ctx.hunt(el.dataset.mob); });
+  // Odds take a few practice fights each; fill them in after the first paint.
+  later(() => app.querySelectorAll('[data-odds]').forEach((el) => {
+    el.innerHTML = oddsChip(run.mobOdds(el.dataset.odds));
+  }));
   app.querySelector('#gear').onclick = () => ctx.go('gear', { mode: 'view' });
   app.querySelector('#bag').onclick = () => ctx.go('gear', { mode: 'view', focus: 'bag' });
   app.querySelector('#scrolls').onclick = () => scrollPicker(ctx);
@@ -135,12 +158,12 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
         <div class="doll-stage" data-scene="duel,2,0.86">${heroImg(gh.look, gh.equip, 2, { flip: true })}</div>
         <div>
           <div class="name">${gh.name} <span class="chip trait">${gh.record}</span></div>
-          <div class="sub">${gh.archetype}</div>
+          <div class="sub">${gh.archetype}${gh.mine ? ' · <span style="color:var(--gold)">your past build</span>' : ''}</div>
           <div class="cmp"><span>DPS <b>${gh2.dps}</b></span><span>EHP <b>${gh2.ehp}</b></span><span>Def <b>${gf.def}</b></span><span>Res <b>${fmtPct(gf.resist)}</b></span></div>
           <div class="slots">${['weapon', 'hat', 'top', 'gloves', 'shoes', 'trinket1', 'trinket2'].map((s) => gh.equip[s] ? tile(gh.equip[s], { size: 1.5, attrs: `data-foe="${s}"` }) : '').join('')}</div>
         </div>
       </div>
-      <div class="vs">— VS —</div>`;
+      <div class="vs" id="duel-odds"><span class="odds-chip o0">Sizing up…</span></div>`;
   }
 
   const setChips = Object.entries(counts).map(([fam, n]) => {
@@ -163,6 +186,8 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
     <section class="screen">
       ${foeHtml}
       ${mode !== 'duel' ? `<div><h2>${run.name}'s gear</h2><div class="sub">Tap any item to equip, scroll or scrap it.</div></div>` : ''}
+      ${mode === 'duel' ? tip('duel', 'Tap an item in your bag to see how swapping it changes your odds. Poison and burn ignore Def; heavy hits punch through it.') : ''}
+      ${mode === 'hub' ? tip('hub', '<b>DPS</b> is damage per second. <b>EHP</b> is how much damage you can take, counting Def. Gold buys scrolls: tap any item to upgrade it.') : ''}
       <div class="paperdoll panel">
         <div class="col">${slotTile('hat', 'Hat')}${slotTile('top', 'Top')}${slotTile('gloves', 'Gloves')}${slotTile('shoes', 'Shoes')}</div>
         <div class="doll-stage ${pop ? 'pop' : ''}" data-scene="${mode === 'duel' ? 'duel' : 'slime'},${S},0.88">${heroImg(run.look, run.equip, S)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
@@ -185,6 +210,8 @@ export function gearScreen(app, ctx, { mode = 'hub', focus } = {}) {
       <div class="actions sticky">${primary}</div>
     </section>`;
   mountScenes(app);
+  bindTips(app);
+  if (mode === 'duel') later(() => { const el = app.querySelector('#duel-odds'); if (el) el.innerHTML = oddsChip(run.duelOdds(), 'Your odds: '); });
 
   app.querySelectorAll('[data-slot]').forEach((el) => {
     const inst = run.equip[el.dataset.slot];
@@ -237,9 +264,11 @@ export function lootScreen(app, ctx) {
     ${hud(run)}
     <section class="screen">
       <div><h2>Pick your drop</h2><div class="sub">${run.isDuel ? 'Duel spoils — every rarity bumped up a tier.' : 'Keep one. The other two stay behind.'}</div></div>
+      ${tip('loot', 'Tap a drop to compare it with what you wear. Spare pieces can ride in your bag for later duels, or be scrapped for gold.')}
       ${cards}
       <div class="grow"></div>
     </section>`;
+  bindTips(app);
   app.querySelectorAll('[data-loot]').forEach((el) => {
     el.onclick = () => itemSheet(ctx, run.loot[+el.dataset.loot], { from: 'loot' });
   });
@@ -262,7 +291,15 @@ export function endScreen(app, ctx) {
       <div class="sub">${sub}</div>
       <div class="stage panel" data-scene="${run.crown ? 'boar' : 'duel'},${S},0.86">${heroImg(run.look, run.equip, S)}</div>
       <div class="nameplate">${run.name} · <span class="num">${run.record}</span></div>
-      <div class="cmp" style="justify-content:center;font-size:14px"><span>DPS <b>${h.dps}</b></span><span>EHP <b>${h.ehp}</b></span></div>
+      <div class="endstats panel">
+        <div><span class="k">DPS</span><span class="v">${h.dps}</span></div>
+        <div><span class="k">EHP</span><span class="v">${h.ehp}</span></div>
+        <div><span class="k">DAMAGE</span><span class="v">${run.stats?.dealt ?? 0}</span></div>
+        <div><span class="k">BEST HIT</span><span class="v">${run.stats?.bestHit ?? 0}</span></div>
+        <div><span class="k">CRITS</span><span class="v">${run.stats?.crits ?? 0}</span></div>
+        <div><span class="k">HEALED</span><span class="v">${run.stats?.healed ?? 0}</span></div>
+      </div>
+      ${ctx.best ? `<div class="sub num" style="font-size:11px">${bestLine(ctx.best)}</div>` : ''}
       <div class="history">${run.history.map((x) => `<span class="h ${x.result}">R${x.round} ${x.duel ? '⚔' : ''} ${x.label} · ${x.result}</span>`).join('')}</div>
       <div class="grow"></div>
       <div class="actions" style="width:100%"><button class="btn primary" id="again">New run ▸</button></div>
@@ -294,6 +331,11 @@ export function itemSheet(ctx, inst, where) {
       <div><div class="k">DPS</div><div class="v">${delta(before.dps, after.dps)}</div></div>
       <div><div class="k">EHP</div><div class="v">${delta(before.ehp, after.ehp)}</div></div>
     </div>${cur ? `<div class="sub" style="margin-top:6px">Compared with your ${itemName(cur)}${targetSlots.length > 1 ? ' (trinket 1)' : ''}.</div>` : ''}`;
+    if (where.from === 'bag' && duelPending(run)) {
+      const a = run.duelOdds();
+      const b = run.duelOdds(run.withItem(inst, targetSlots[0]));
+      cmp += `<div class="duelcmp">vs ${run.ghost.name}: ${oddsChip(a)} → ${oddsChip(b)}</div>`;
+    }
   } else if (where.from === 'equip') {
     const after = run.headline({ ...run.equip, [where.slot]: null });
     cmp = `<div class="cmpbox">
@@ -407,4 +449,73 @@ function scrollPicker(ctx) {
       el.onclick = () => { const o = owned[+el.dataset.i]; itemSheet(ctx, o.inst, o.where); };
     });
   });
+}
+
+// Defer heavy work (odds) until after the browser paints the screen.
+function later(fn) {
+  requestAnimationFrame(() => setTimeout(fn, 0));
+}
+
+// True in a duel round before the duel has been fought.
+function duelPending(run) {
+  return run.isDuel && run.ghost && !run.history.some((h) => h.round === run.round);
+}
+
+// ---------------------------------------------------------------- menu & help
+
+export function menuSheet(ctx) {
+  const html = `
+    <h2>Menu</h2>
+    <div class="menu-list">
+      <button class="btn" data-m="help">How to play</button>
+      <button class="btn" data-m="tips">Show tips again</button>
+      ${ctx.run && !ctx.run.over ? '<button class="btn danger" data-m="abandon">Abandon run</button>' : ''}
+      <button class="btn" data-m="close">Close</button>
+    </div>`;
+  openSheet(html, (sheet) => {
+    sheet.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-m]');
+      if (!b) return;
+      const m = b.dataset.m;
+      if (m === 'help') helpSheet();
+      else if (m === 'tips') { resetTips(); closeSheet(); ctx.refresh(); toast('Tips will show again'); }
+      else if (m === 'abandon') {
+        if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to abandon'; return; }
+        ctx.abandon();
+      } else closeSheet();
+    });
+  });
+}
+
+export function helpSheet() {
+  const stat = (k, v) => `<div class="gl"><b>${k}</b><span>${v}</span></div>`;
+  const statuses = Object.entries(STATUSES).map(([id, st]) => `
+    <div class="gl"><b style="color:${st.color}">${statusGlyph(id, 2)} ${st.name}</b><span>${st.desc}</span></div>`).join('');
+  const html = `
+    <h2>How to play</h2>
+    <div class="help">
+      <p><b>The run.</b> 9 rounds, 3 lives. Rounds 3, 6 and 9 are duels against another player's saved build. Win round 9 for a Crown.</p>
+      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear and pay more gold. A loss costs a life.</p>
+      <p><b>Duels.</b> You see the rival's gear first. Swap items in from your bag to counter them; the odds update as you do.</p>
+      <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
+      <p><b>Scrolls.</b> Every item has 3 upgrade slots. Sure: 100%, +1. Chancy: 60%, +3. Long-shot: 10%, +8. A slot is used either way.</p>
+      <h3>Stats</h3>
+      ${stat('DPS', 'Average damage per second.')}
+      ${stat('EHP', 'Effective HP: health counting Def.')}
+      ${stat('Atk', 'Added to every weapon hit.')}
+      ${stat('Def', 'Removed from every physical hit (min 1). Magic ignores half. Status damage ignores all of it.')}
+      ${stat('Crit', 'Chance to hit for 150%.')}
+      ${stat('Haste', 'Faster attacks.')}
+      ${stat('Resist', 'Shortens harmful statuses on you, up to 50%.')}
+      ${stat('Lifesteal', 'Heals you for a share of damage dealt.')}
+      <h3>Statuses</h3>
+      ${statuses}
+    </div>
+    <div class="actions"><button class="btn" id="help-close">Close</button></div>`;
+  openSheet(html, (sheet) => { sheet.querySelector('#help-close').onclick = closeSheet; });
+}
+
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 'S'}`;
+function bestLine(b) {
+  return `${plural(b.runs, 'RUN')} · ${plural(b.crowns, 'CROWN')} · BEST ${plural(b.bestWins, 'WIN')}`;
 }

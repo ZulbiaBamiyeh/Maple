@@ -18,7 +18,7 @@ npm start            # http://localhost:5173
 Open it at phone width (portrait). Add `?seed=123` to replay a run exactly.
 
 ```sh
-npm test                      # M1 combat acceptance tests
+npm test                      # combat, full-run, save and ghost tests
 node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rate
 ```
 
@@ -31,6 +31,11 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 | **Duels** | You see the opponent's full loadout and their DPS and EHP, then counter-equip from your 6-slot bag. The 9 hand-written ghosts are 3 per duel round. Duel loot comes from the ghost's gear, with rarity bumped up a tier. |
 | **Combat** | `simulate(a, b, seed)` in [src/sim.js](src/sim.js) is a pure function on fixed 50 ms ticks with seeded mulberry32. It covers all 6 weapon types, all 10 statuses, every trinket trigger, overtime, and draws. The battle screen only replays its frames and events at 1×, 2× or Skip. |
 | **Battle feel** | Fighters slide in under a FIGHT! callout. Each attack winds up, dashes in and strikes on the exact tick its damage lands. Every weapon and monster attacks its own way: sword and axe arcs, spear thrusts, magic bolts, slime hops, boar charges and golem slams. Hits bring flashes, knockback, sparks, screen shake on crits, popping damage numbers and status icons. A KO bursts the loser into pixels while the winner hops. The HP bars sit inside the arena. |
+| **Odds** | Every hunt card shows your chances with your current gear, in five bands from Deadly to Easy win. The duel preview shows **your odds against the rival, updating as you swap gear**, and each bag item's sheet shows how equipping it would shift them. The odds come from practice fights on seeds the real fight never uses. |
+| **Your ghosts** | Entering a duel saves your build on this device. Later runs can match you against your past builds (half the time, when one exists for that round), alongside the hand-written rivals. |
+| **Saving** | The run auto-saves on this device, and the title screen offers Continue. A fight's result is locked in before it plays, so reloading mid-battle can't undo a loss. The game also remembers your battle speed, best record and the tips you've seen. |
+| **Economy** | Wins pay gold: 1 for Easy, 2 for Normal, 3 for Elite and 3 for a duel. A loss pays 2. Gold buys scrolls. |
+| **Help** | One-time tips on each screen. The ≡ menu has How to play (every stat and status explained), Show tips again, and Abandon run. |
 | **Readability** | Status chips have stack counts and draining timers. Damage numbers are colour-coded, and an attack-timer bar sits under each HP bar. After every fight a breakdown shows who dealt what, split into hits, crits, burn, poison, bleed and thorns. |
 | **Gear** | 30 items: 7 weapons, 4 hats, 4 tops, 2 gloves, 2 shoes, and 10 trinkets. Items come in 3 rarities with affixes. Wearing 2 pieces from one mob family unlocks its set bonus. There are 3 scroll types, and every item has 3 upgrade slots. |
 | **Comparisons** | Every item sheet shows `DPS a → b ▲` and `EHP a → b ▼` against what you're wearing now. |

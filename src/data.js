@@ -7,6 +7,9 @@ export const BAG_SIZE = 6;
 export const LIVES = 3;
 export const ROUNDS = 9;
 export const DUEL_ROUNDS = [3, 6, 9];
+// Gold for a win, by what you beat. Losses pay 2 as consolation.
+export const GOLD_WIN = { easy: 1, normal: 2, elite: 3, duel: 3 };
+export const GOLD_LOSS = 2;
 
 export const scaleFor = (round) => 1 + 0.12 * (round - 1);
 

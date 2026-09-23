@@ -204,7 +204,7 @@ h2 { font-size: 22px; }
 .foe .doll-stage .hero { margin-bottom: 4px; }
 .foe .name { font-size: 20px; font-weight: 700; }
 .foe .slots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-.foe .slots .tile { width: 40px; height: 40px; border-width: 2px; }
+.foe .slots .tile { width: 44px; height: 44px; border-width: 2px; }
 .vs { text-align: center; font-size: 13px; color: var(--muted); font-family: var(--num); }
 
 /* ------------------------------------------------------------------ battle */
@@ -380,3 +380,47 @@ h2 { font-size: 22px; }
 .hrt.break { animation: hbreak .7s steps(7); }
 @keyframes hbreak { 0% { transform: scale(1.6); filter: brightness(2); } 30% { transform: translate(-3px, 0) rotate(-12deg); } 60% { transform: translate(3px, 2px) rotate(8deg); } 100% { transform: none; } }
 .mobcard.deal { animation-duration: .4s; }
+
+/* ------------------------------------------------------------------ odds, tips, menu */
+.hud-r { display: flex; align-items: center; gap: 8px; }
+.menu-btn {
+  width: 36px; height: 36px; display: grid; place-content: center; gap: 3px; padding: 0; margin: -4px -4px -4px 0;
+  background: var(--panel); border: 2px solid var(--edge); border-radius: 6px; cursor: pointer;
+}
+.menu-btn i { display: block; width: 14px; height: 2px; background: var(--muted); }
+.menu-btn:active { transform: translateY(2px); }
+.odds-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
+  padding: 2px 8px 2px 6px; border-radius: 4px; border: 2px solid; white-space: nowrap;
+}
+.pips5 { display: inline-flex; gap: 2px; }
+.pips5 i { width: 5px; height: 10px; background: currentColor; opacity: .22; border-radius: 1px; }
+.pips5 i.on { opacity: 1; }
+.o0 { color: var(--dim); border-color: var(--edge); font-weight: 400; }
+.o1 { color: #ff6b76; border-color: #8f2437; background: #8f243726; }
+.o2 { color: #ffb08a; border-color: #b85a2a; background: #b85a2a26; }
+.o3 { color: #ffe08a; border-color: #b8862b; background: #b8862b26; }
+.o4 { color: #a6e87e; border-color: #3d7f37; background: #3d7f3726; }
+.o5 { color: #8ff0d0; border-color: #2f8f76; background: #2f8f7626; }
+.oddsline { min-height: 26px; }
+.vs { display: flex; justify-content: center; align-items: center; gap: 8px; min-height: 30px; }
+.duelcmp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.tip {
+  display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.4; color: var(--text);
+  background: #2d4a6b; border: 2px solid #4f9cf0; border-radius: 6px; padding: 8px 8px 8px 12px;
+  animation: in .3s steps(4);
+}
+.tip > div { flex: 1; }
+.tip-x { flex: none; min-height: 32px; padding: 0 10px; font-weight: 700; font-size: 12px; background: #4f9cf0; color: var(--ink); border: 0; border-radius: 4px; cursor: pointer; }
+.menu-list { display: grid; gap: 10px; margin-top: 12px; }
+.help { display: grid; gap: 8px; font-size: 14px; line-height: 1.45; margin-top: 8px; max-width: 65ch; }
+.help p { margin: 0; color: var(--muted); }
+.help p b { color: var(--text); }
+.help h3 { font-size: 16px; margin-top: 8px; }
+.gl { display: grid; grid-template-columns: 96px 1fr; gap: 8px; align-items: baseline; font-size: 13px; }
+.gl b { display: inline-flex; align-items: center; gap: 4px; }
+.gl span { color: var(--muted); }
+.endstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; padding: 10px; width: 100%; }
+.endstats > div { display: flex; flex-direction: column; align-items: center; }
+.endstats .k { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+.endstats .v { font-family: var(--num); font-size: 18px; font-variant-numeric: tabular-nums; }

@@ -7,6 +7,7 @@ import { mobGrid, MOB_SIZE } from '../art/mobs.js';
 import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
 import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES } from '../data.js';
+import { tipSeen, markTip } from './store.js';
 
 const urls = new Map();
 function dataUrl(key, make) {
@@ -87,7 +88,8 @@ export function hud(run) {
   return `<header class="hud">
     <div class="lives" aria-label="${run.lives} lives">${hearts}</div>
     <div><div class="pips">${pips.join('')}</div><div class="round-label">ROUND ${run.round}/${ROUNDS} · ${run.isDuel ? 'DUEL' : 'HUNT'}</div></div>
-    <div class="gold ${goldBump ? 'bump' : ''}">${glyph('coin', 3)}<span>${run.gold}</span></div>
+    <div class="hud-r"><div class="gold ${goldBump ? 'bump' : ''}">${glyph('coin', 3)}<span>${run.gold}</span></div>
+    <button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button></div>
   </header>`;
 }
 
@@ -123,4 +125,34 @@ export function delta(a, b, fmt = (x) => x) {
   if (Math.abs(a - b) < 0.05) return `<span>${fmt(a)}</span>`;
   const good = b > a;
   return `<span>${fmt(a)} → <b class="${good ? 'up-good' : 'down-bad'}">${fmt(b)} ${good ? '▲' : '▼'}</b></span>`;
+}
+
+// ---------------------------------------------------------------- odds
+
+// Win chance in five plain bands. The exact number stays hidden: it's an
+// estimate from practice fights, and bands read faster on a phone.
+export function oddsBand(p) {
+  if (p >= 0.85) return { label: 'Easy win', cls: 'o5' };
+  if (p >= 0.6) return { label: 'Favored', cls: 'o4' };
+  if (p >= 0.4) return { label: 'Even', cls: 'o3' };
+  if (p >= 0.15) return { label: 'Risky', cls: 'o2' };
+  return { label: 'Deadly', cls: 'o1' };
+}
+export function oddsChip(p, prefix = '') {
+  const b = oddsBand(p);
+  const pips = [1, 2, 3, 4, 5].map((i) => `<i class="${i <= +b.cls[1] ? 'on' : ''}"></i>`).join('');
+  return `<span class="odds-chip ${b.cls}">${prefix}<span class="pips5">${pips}</span>${b.label}</span>`;
+}
+
+// ---------------------------------------------------------------- tips
+
+// A one-time hint card. Dismissed tips never come back (per device).
+export function tip(key, html) {
+  if (tipSeen(key)) return '';
+  return `<div class="tip" data-tip="${key}"><div>${html}</div><button class="tip-x" aria-label="Got it">Got it</button></div>`;
+}
+export function bindTips(root) {
+  root.querySelectorAll('[data-tip]').forEach((el) => {
+    el.querySelector('.tip-x').onclick = () => { markTip(el.dataset.tip); el.remove(); };
+  });
 }
