@@ -2,7 +2,7 @@
 
 import {
   ITEMS, WEAPON_TYPES, FAMILIES, BASE, RESIST_CAP, MOBS, AFFIXES, RARITIES, rarityOdds, MOB_POWER, PERKS, PERK_ODDS,
-  slotKind, scaleFor,
+  slotKind, scaleFor, dayOf,
 } from './data.js';
 
 let uidCounter = 1;
@@ -203,7 +203,7 @@ export function heroFighter(build) {
 export function mobFighter(mobId, round) {
   const m = MOBS[mobId];
   const s = scaleFor(round);
-  const p = s * (MOB_POWER[mobId] ?? 1);
+  const p = s * (MOB_POWER[mobId]?.[dayOf(round) - 1] ?? 1);
   const st = m.stats || {};
   return {
     name: m.name, kind: 'mob', mob: mobId, scale: s,

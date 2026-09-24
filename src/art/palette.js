@@ -56,6 +56,13 @@ export const RAMPS = {
   drake: ['#ff8f6b', '#d63e3e', '#7d1f33'],
   storm: ['#8fb4ff', '#4b6cd1', '#283d8a'],
   crystal: ['#f4ecff', '#c7b2f5', '#8a73cc'],
+  sand: ['#fbe6b0', '#e0bd72', '#a8843f'],
+  scarab: ['#7fe0c8', '#2f9e9a', '#1f5a6a'],
+  berry: ['#ff8fa8', '#d63a5a', '#86203e'],
+  leaf: ['#b7f08a', '#5fa84a', '#2f6a2e'],
+  honey: ['#ffe98a', '#f5b82e', '#a8701a'],
+  yeti: ['#ffffff', '#dfe6f2', '#9aa6c0'],
+  rime: ['#e6fbff', '#8fd8f0', '#3f8fc0'],
   // default outfits under the armour
   under_girl: ['#fde7ef', '#f6b8cc', '#d4829d'],
   under_boy: ['#e6f0ff', '#a9c1e6', '#6f89b8'],

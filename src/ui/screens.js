@@ -9,13 +9,12 @@ import {
   ITEMS, MOBS, FAMILIES, RARITIES, rarityOdds, BAG_SIZE,
   slotKind, scaleFor, STATUSES, dayInfo, dayOf, slotOf, DAYS_IN_RUN, ROUNDS, ROUNDS_PER_DAY, STAT_HELP,
 } from '../data.js';
-import { statLines, perkLines, setCounts, activeSets, headline } from '../items.js';
+import { statLines, perkLines, setCounts, activeSets, headline, mobFighter } from '../items.js';
 import { drawScene } from '../art/scenes.js';
 import {
   hud, heroImg, iconImg, mobImg, glyph, statusGlyph, tile, itemName, slotName, cap,
-  openSheet, closeSheet, toast, delta, oddsChip, firstTime,
+  openSheet, closeSheet, toast, delta, oddsChip,
 } from './common.js';
-import { resetTips } from './store.js';
 
 // ---------------------------------------------------------------- stages
 
@@ -82,25 +81,6 @@ function later(fn) {
 }
 
 
-// ---------------------------------------------------------------- first-time popups
-
-const INTRO = {
-  hunt: ['Choose your hunt', `
-    <p>Pick one of three monsters. The fight plays itself.</p>
-    <p>Each card shows what it <b>drops</b> and your <b>odds</b> with your current gear. Tougher monsters drop rarer loot. Lose and you just get nothing this round.</p>
-    <p>Each day ends in a <b>duel</b> against another player's build. Losing a duel costs one of your 3 lives. Survive 5 days and win the last duel for a Crown.</p>`],
-  loot: ['Pick your drop', `
-    <p>Keep one of three drops. Tap it to compare with what you wear.</p>
-    <p><b>Equip</b> it, stash it in your <b>bag</b> for later, or leave it behind.</p>`],
-  hub: ['Your gear', `
-    <p><b>DPS</b> is your damage per second. <b>EHP</b> is how much you can take, counting Def.</p>
-    <p>Tap any item to swap it, or discard it to free up bag space. Two pieces from one monster family unlock a set bonus.</p>`],
-  duelBlind: ['Duel!', `
-    <p>You face another player's saved build. You won't see it until the fight starts.</p>
-    <p>Go in with your strongest all-round gear. A win adds to your record; a loss costs a life. Either way you'll see their build afterwards.</p>`],
-};
-const intro = (key) => firstTime(key, ...INTRO[key]);
-
 // ---------------------------------------------------------------- title
 
 export function titleScreen(app, ctx) {
@@ -141,9 +121,9 @@ export function titleScreen(app, ctx) {
 
 export function pickScreen(app, ctx) {
   const { run } = ctx;
-  const sc = scaleFor(run.round);
   const cards = run.offers.map((id, i) => {
     const m = MOBS[id];
+    const mf = mobFighter(id, run.round);
     const odds = rarityOdds(m.tier, run.day);
     const ap = m.onHit?.[0]?.apply || m.triggers?.find((tr) => tr.effect.apply)?.effect.apply;
     const traitGlyph = ap ? statusGlyph(ap, 2) : m.regen ? statusGlyph('regen', 2) : '';
@@ -153,7 +133,7 @@ export function pickScreen(app, ctx) {
       <div class="info">
         <div class="name"><span>${m.name}</span><span class="chip tier-${m.tier}">${cap(m.tier)}</span></div>
         <div class="oddsline" data-odds="${id}"><span class="odds-chip o0">…</span></div>
-        <div class="line">HP ${Math.round(m.hp * sc)} · Hit ${Math.round(m.min * sc)}–${Math.round(m.max * sc)} · ${m.interval}s${m.def ? ` · Def ${m.def}` : ''}</div>
+        <div class="line">HP ${mf.maxHp} · Hit ${mf.weapon.min}–${mf.weapon.max} · ${m.interval}s${m.def ? ` · Def ${m.def}` : ''}</div>
         <div class="traitrow"><span class="chip trait" ${ap ? `data-tipstatus="${ap}"` : ''}>${traitGlyph} ${m.trait}</span></div>
         <div class="drops">${m.drops.map((d) => `<span class="drop ${ITEMS[d].relic ? 'relic-drop' : ''}" data-tipdef="${d}">${iconImg(d, 1.2)}</span>`).join('')}</div>
         <div class="odds" aria-label="Common ${odds[0][1]}%, rare ${odds[1][1]}%, epic ${odds[2][1]}%">
@@ -165,7 +145,7 @@ export function pickScreen(app, ctx) {
   app.innerHTML = `
     ${hud(run)}
     <section class="screen">
-      <div class="day-kicker">DAY ${run.day} · ${dayInfo(run.round).name.toUpperCase()}</div>
+      <div class="day-kicker">DAY ${run.day} · ${run.dayInfo().name.toUpperCase()}</div>
       <h2>Choose your hunt</h2>
       <div class="mobs">${cards}</div>
       <div class="actions">
@@ -186,13 +166,12 @@ export function pickScreen(app, ctx) {
     run._dayShown = run.day;
     const card = document.createElement('div');
     card.className = 'day-card';
-    card.innerHTML = `<div class="n">DAY ${run.day}<span>/${DAYS_IN_RUN}</span></div><div class="t">${dayInfo(run.round).name}</div>
-      <div class="s">${run.day === 1 ? 'Three hunts, then duel a rival.' : run.day === DAYS_IN_RUN ? 'The last day. Win the final duel for the Crown.' : 'Tougher monsters, better loot.'}</div>`;
+    card.innerHTML = `<div class="n">DAY ${run.day}<span>/${DAYS_IN_RUN}</span></div><div class="t">${run.dayInfo().name}</div>`;
     app.append(card);
     const bye = () => { card.classList.add('out'); setTimeout(() => card.remove(), 300); };
     card.onclick = bye;
     setTimeout(bye, 1700);
-  } else intro('hunt');
+  }
 }
 
 // ---------------------------------------------------------------- gear hub / duel preview
@@ -225,7 +204,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
         <div class="foe-info">
           <div class="kicker">DUEL · DAY ${run.day}</div>
           <div class="name">${gh.name} <span class="chip trait">${gh.record}</span></div>
-          <div class="sub">${gh.mine ? 'One of your past builds. ' : ''}Build hidden until the fight.</div>
+          ${gh.mine ? '<div class="sub">Your past build</div>' : ''}
         </div>
       </div>`;
   }
@@ -251,7 +230,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
       ${foeHtml}
       <div class="paperdoll panel">
         <div class="col">${slotTile('hat', 'Hat')}${slotTile('top', 'Top')}${slotTile('gloves', 'Gloves')}${slotTile('shoes', 'Shoes')}</div>
-        <div class="doll-stage ${pop ? 'pop' : ''}" data-stage="${mode === 'duel' ? 'duel' : dayInfo(Math.min(run.round, ROUNDS)).biome},0.88,5">${heroImg(run.look, run.equip, 4)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
+        <div class="doll-stage ${pop ? 'pop' : ''}" data-stage="${mode === 'duel' ? 'duel' : run.dayInfo().biome},0.88,5">${heroImg(run.look, run.equip, 4)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
         <div class="col">${slotTile('weapon', 'Weapon')}${slotTile('trinket1', 'Trinket')}${slotTile('trinket2', 'Trinket')}</div>
       </div>
       <div class="statpanel panel">
@@ -282,8 +261,6 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
     else if (mode === 'view') ctx.go('pick');
     else ctx.nextRound();
   };
-  if (mode === 'duel') intro('duelBlind');
-  else if (mode === 'hub') intro('hub');
 }
 
 // ---------------------------------------------------------------- loot
@@ -323,7 +300,6 @@ export function lootScreen(app, ctx) {
   app.querySelectorAll('[data-loot]').forEach((el) => {
     el.onclick = () => itemSheet(ctx, run.loot[+el.dataset.loot], { from: 'loot' });
   });
-  intro('loot');
 }
 
 // ---------------------------------------------------------------- end
@@ -491,7 +467,6 @@ export function menuSheet(ctx) {
     <h2>Menu</h2>
     <div class="menu-list">
       <button class="btn" data-m="help">How to play</button>
-      <button class="btn" data-m="tips">Show intro popups again</button>
       ${ctx.run && !ctx.run.over ? '<button class="btn danger" data-m="abandon">Abandon run</button>' : ''}
       <button class="btn" data-m="close">Close</button>
     </div>`;
@@ -501,7 +476,6 @@ export function menuSheet(ctx) {
       if (!b) return;
       const m = b.dataset.m;
       if (m === 'help') helpSheet();
-      else if (m === 'tips') { resetTips(); closeSheet(); toast('Intro popups will show again'); }
       else if (m === 'abandon') {
         if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Tap again to abandon'; return; }
         ctx.abandon();
@@ -517,12 +491,8 @@ export function helpSheet() {
   const html = `
     <h2>How to play</h2>
     <div class="help">
-      <p><b>The run.</b> 5 days, 3 lives. Each day is three hunts, then a duel against another player's saved build. Each day's monsters are tougher than the last. Win the final duel for a Crown.</p>
-      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Easy monsters are a safe item, mostly Common; Normal and Elite drop the Rare and Epic gear where perks and relics live. Losing a hunt just means no drop.</p>
-      <p><b>Duels.</b> Hidden until the fight starts. Build for all-round strength. A win adds to your record (no items); lose and you lose a life.</p>
-      <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
-      <p><b>Perks and relics.</b> Rare and epic drops can roll ✦ perks: niche effects to build around. Every elite also guards a <b>relic</b>, a rule-bending trinket (never common).</p>
-      <p><b>Bag.</b> Six slots for spare pieces. Discard what you don't need.</p>
+      <p>5 days · 3 hunts then a duel · 3 lives. Only duels cost lives. Win day 5 for the Crown.</p>
+      <p>2 pieces of one family = set bonus.</p>
       <h3>Stats</h3>
       ${Object.entries(STAT_HELP).map(([k, v]) => stat(k, v)).join('')}
       <h3>Statuses</h3>

@@ -17,6 +17,9 @@ const BIOMES = {
   moor: { sky: ['#161c2e', '#252f48', '#3e4c66'], far: '#28323e', near: '#1a2028', ground: ['#4e5e4a', '#2e3a30', '#2a2622', '#1a1614'], deco: 'moor' },
   peak: { sky: ['#e8705a', '#ffa46a', '#ffd89a'], far: '#7a4a5e', near: '#4e2e40', ground: ['#8a6a5a', '#5a4038', '#3a2a24', '#241a18'], deco: 'peak' },
   duel: { sky: ['#2d2447', '#4a3b6e', '#8a5a9e'], far: '#4a3b6e', near: '#2d2447', ground: ['#aeb4c8', '#6b6a80', '#44475e', '#2a2238'], deco: 'stars' },
+  desert: { sky: ['#f2a65a', '#ffc98a', '#ffe8b8'], far: '#e0a868', near: '#d09050', ground: ['#f2d48a', '#d0a458', '#b08040', '#7a5a2e'], deco: 'desert' },
+  orchard: { sky: ['#8fd0f0', '#b8e4f8', '#e8f8ff'], far: '#7ab870', near: '#4e9440', ground: ['#86c860', '#4e9440', '#7a4a2c', '#4e2e1d'], deco: 'orchard' },
+  glacier: { sky: ['#bfe0f8', '#d8eefc', '#f2faff'], far: '#a8c8e8', near: '#d8ecfa', ground: ['#ffffff', '#d8ecfa', '#8fb8e0', '#5a7eb0'], deco: 'glacier' },
 };
 
 export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
@@ -65,6 +68,15 @@ export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
   } else if (b.deco === 'peak') {
     peaks(ctx, W, groundY, b.far, 22, rnd, '#f4f1ff');
     peaks(ctx, W, groundY, b.near, 12, rnd, null);
+  } else if (b.deco === 'desert') {
+    // a hot sun, a far pyramid, then long low dunes
+    circle(ctx, Math.floor(W * 0.22), Math.floor(groundY * 0.3), 8, '#fff6c8');
+    pyramid(ctx, Math.floor(W * (0.55 + rnd() * 0.25)), groundY - 6, 20, '#c89050', '#a87038');
+    hills(ctx, W, groundY, b.far, 0.35, 10, rnd);
+    hills(ctx, W, groundY, b.near, 0.2, 5, rnd);
+  } else if (b.deco === 'glacier') {
+    peaks(ctx, W, groundY, b.far, 20, rnd, '#ffffff');
+    peaks(ctx, W, groundY, b.near, 9, rnd, null);
   } else {
     // far hills
     hills(ctx, W, groundY, b.far, 0.55, 14, rnd);
@@ -86,6 +98,18 @@ export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
   }
   if (b.deco === 'peak') {
     for (let i = 0; i < W / 8; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY), rnd() > 0.5 ? '#ffc36b' : '#f58a3a');
+  }
+
+  if (b.deco === 'desert') {
+    for (let i = 0; i < 3; i++) cactus(ctx, Math.floor(rnd() * W), groundY, 5 + Math.floor(rnd() * 5));
+  }
+  if (b.deco === 'orchard') {
+    for (let i = 0; i < 3; i++) cloud(ctx, Math.floor(rnd() * W), 6 + Math.floor(rnd() * groundY * 0.3), '#ffffff', rnd);
+    for (let i = 0; i < 5; i++) berryTree(ctx, Math.floor(rnd() * W), groundY, rnd);
+  }
+  if (b.deco === 'glacier') {
+    for (let i = 0; i < W / 5; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY), '#ffffff');
+    for (let i = 0; i < 4; i++) crystal(ctx, Math.floor(rnd() * W), groundY - 1, '#8fd8f0');
   }
 
   if (b.deco === 'crystals') {
@@ -217,4 +241,35 @@ function shellDeco(ctx, x, y, rnd) {
   ctx.fillStyle = rnd() > 0.5 ? '#ff9c8a' : '#f0dcef';
   ctx.fillRect(x, y, 3, 1);
   ctx.fillRect(x + 1, y - 1, 1, 1);
+}
+
+function pyramid(ctx, cx, baseY, h, lit, shade) {
+  for (let y = 0; y < h; y++) {
+    const w = h - y;
+    ctx.fillStyle = lit;
+    ctx.fillRect(cx - w, baseY - y, w, 1);
+    ctx.fillStyle = shade;
+    ctx.fillRect(cx, baseY - y, w, 1);
+  }
+}
+
+function cactus(ctx, x, groundY, h) {
+  ctx.fillStyle = '#4e9440';
+  ctx.fillRect(x, groundY - h, 3, h);
+  ctx.fillRect(x - 2, groundY - h + 2, 2, 1);
+  ctx.fillRect(x - 2, groundY - h, 1, 3);
+  ctx.fillRect(x + 3, groundY - h + 3, 2, 1);
+  ctx.fillRect(x + 4, groundY - h + 1, 1, 3);
+  ctx.fillStyle = '#86c860';
+  ctx.fillRect(x, groundY - h, 1, h);
+}
+
+function berryTree(ctx, x, groundY, rnd) {
+  const h = 8 + Math.floor(rnd() * 6);
+  ctx.fillStyle = '#7a4a2c';
+  ctx.fillRect(x + 3, groundY - h + 4, 2, h - 4);
+  circle(ctx, x + 4, groundY - h + 2, 5, '#3d7f37');
+  circle(ctx, x + 3, groundY - h + 1, 3, '#5fa84a');
+  ctx.fillStyle = '#d63a5a';
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + Math.floor(rnd() * 9), groundY - h - 1 + Math.floor(rnd() * 6), 1, 1);
 }

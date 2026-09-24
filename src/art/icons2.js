@@ -28,6 +28,12 @@ const R = {
   poison: ['#e6ffb0', '#9ee06a', '#5aa83e', '#2f6a2e'],
   blood: ['#ff9aa8', '#e04a5a', '#a8243c', '#5e1830'],
   heart: ['#ffe0ea', '#ff8fb0', '#e04a7a', '#8f2450'],
+  sand: ['#fff4d0', '#f2d48a', '#d0a458', '#8f6a32'],
+  scarab: ['#b8fff0', '#4ed0b8', '#2f8f9a', '#1a4a5e'],
+  berry: ['#ffb0c0', '#e8506e', '#b02e4e', '#6e1a34'],
+  leaf: ['#d0f5a0', '#86c860', '#4e9440', '#2e5e2a'],
+  honey: ['#fff4a0', '#ffd23a', '#e0a020', '#8a5a10'],
+  ice: ['#ffffff', '#c8f4ff', '#7fd0ec', '#3a8ac0'],
 };
 const H = (r) => r[0], L = (r) => r[1], M = (r) => r[2], D = (r) => r[3];
 
@@ -237,6 +243,80 @@ const PAINT = {
     p.poly([[1.5, 7], [8, 7], [8, 15]], L(R.heart));
     p.line(8, 4, 6, 8, 'w'); p.line(6, 8, 9, 10, 'w'); p.line(9, 10, 7, 13, 'w');
     p.px(4, 4, 'w'); p.px(4, 5, H(R.heart));
+  },
+
+  // Desert, Orchard and Glacier
+  t_mirage(p) {
+    // a shimmering eye-charm in a sand-gold frame
+    p.ellipse(8, 8, 7, 5.5, R.sand);
+    p.ellipse(8, 8, 4.6, 3.4, R.glass);
+    p.ellipse(8, 8, 2, 2, ['#3a78c9', '#3a78c9', '#283d8a', '#1a1423']);
+    p.px(7, 7, 'w');
+    for (const x of [2, 14]) p.px(x, 8, D(R.sand));
+  },
+  t_scarab(p) {
+    p.ellipse(8, 9, 5.5, 5.5, R.scarab);
+    p.line(8, 4, 8, 14, D(R.scarab));
+    p.ellipse(8, 3, 2.5, 2, R.gold);
+    // sun wings
+    p.poly([[3, 7], [0, 4], [1, 10]], L(R.gold)); p.poly([[13, 7], [16, 4], [15, 10]], M(R.gold));
+    p.px(6, 7, H(R.scarab));
+  },
+  t_berry(p) {
+    p.line(8, 1, 6, 5, M(R.leaf)); p.line(8, 1, 11, 5, M(R.leaf));
+    p.ellipse(11, 2, 3, 1.6, R.leaf);
+    p.ellipse(5, 9, 3.6, 3.6, R.berry); p.ellipse(11, 9, 3.6, 3.6, R.berry); p.ellipse(8, 12, 3.6, 3.6, R.berry);
+    p.px(4, 8, 'w'); p.px(10, 8, 'w'); p.px(7, 11, 'w');
+  },
+  t_honey(p) {
+    // three honeycomb cells, dripping
+    const cell = (cx, cy) => p.poly([[cx - 3, cy], [cx - 1.5, cy - 3], [cx + 1.5, cy - 3], [cx + 3, cy], [cx + 1.5, cy + 3], [cx - 1.5, cy + 3]], M(R.honey));
+    cell(5, 6); cell(11, 6); cell(8, 11);
+    for (const [x, y] of [[5, 6], [11, 6], [8, 11]]) { p.px(x - 1, y - 1, H(R.honey)); p.px(x, y, L(R.honey)); }
+    p.line(11, 9, 11, 13, M(R.honey)); p.px(11, 14, L(R.honey));
+  },
+  t_avalanche(p) {
+    // an iron bell capped with snow
+    p.poly([[5, 4], [11, 4], [13, 12], [3, 12]], M(R.steel));
+    p.poly([[5, 4], [8, 4], [6, 12], [3, 12]], L(R.steel));
+    p.rect(2, 12, 12, 2, D(R.steel));
+    p.ellipse(8, 4, 4.5, 2.2, R.ice);
+    p.ellipse(8, 14.5, 1.5, 1.2, R.steel);
+    p.px(7, 3, 'w');
+  },
+  t_sigil(p) {
+    // a six-point snowflake on a round stone
+    p.ellipse(8, 8, 7, 7, R.steel);
+    for (let a = 0; a < 6; a++) {
+      const t = (a / 6) * Math.PI * 2;
+      p.line(8, 8, 8 + Math.cos(t) * 5, 8 + Math.sin(t) * 5, L(R.ice));
+    }
+    p.px(8, 8, 'w');
+  },
+  r_idol(p) {
+    // a stone idol holding a glowing sunstone
+    p.rect(4, 5, 8, 10, M(R.sand)); p.rect(4, 5, 2, 10, L(R.sand)); p.rect(11, 5, 1, 10, D(R.sand));
+    p.ellipse(8, 4, 4, 3, R.sand);
+    p.rect(6, 3, 1, 1, D(R.sand)); p.rect(9, 3, 1, 1, D(R.sand));
+    p.ellipse(8, 10, 2.8, 2.8, R.ember);
+    p.px(7, 9, 'h');
+    for (const [x, y] of [[2, 10], [14, 10], [8, 15]]) p.px(x, y, L(R.gold));
+  },
+  r_jelly(p) {
+    // a gold-lidded jar of royal jelly
+    p.rect(4, 1, 8, 3, M(R.gold)); p.rect(4, 1, 8, 1, L(R.gold));
+    p.ellipse(8, 10, 5.5, 5, R.glass);
+    p.ellipse(8, 11, 4, 3.4, R.honey);
+    p.px(6, 9, 'w'); p.px(5, 8, 'w');
+    p.stamp(['y.y.y'], 6, 0, { y: L(R.gold) });
+  },
+  r_winter(p) {
+    // a crystal heart with frost inside
+    p.ellipse(5.5, 6, 4, 4, R.ice); p.ellipse(10.5, 6, 4, 4, R.ice);
+    p.poly([[1.5, 7], [14.5, 7], [8, 15]], M(R.ice));
+    p.poly([[1.5, 7], [8, 7], [8, 15]], L(R.ice));
+    for (let a = 0; a < 3; a++) { const t = (a / 3) * Math.PI; p.line(8 - Math.cos(t) * 3, 8 - Math.sin(t) * 3, 8 + Math.cos(t) * 3, 8 + Math.sin(t) * 3, 'w'); }
+    p.px(4, 4, 'w');
   },
 };
 

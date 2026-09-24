@@ -40,20 +40,20 @@ export const STATUSES = {
 
 // What each stat means, for the help sheet and hover cards.
 export const STAT_HELP = {
-  DPS: 'Average damage per second.',
-  EHP: 'Effective HP: health counting Def.',
-  HP: 'Health. Reach 0 and you fall.',
-  Atk: 'Added to every weapon hit.',
-  Def: 'Removed from every physical hit (min 1). Magic ignores half. Status damage ignores all of it.',
-  Crit: 'Chance to hit for 150%.',
-  Haste: 'Faster attacks.',
-  Res: 'Resist: shortens harmful statuses on you, up to 50%.',
-  Steal: 'Lifesteal: heals you for a share of damage dealt.',
-  Regen: 'Heals this much every second.',
-  Evade: 'Evasion: chance to dodge a weapon hit entirely (max 40%).',
-  'Crit dmg': 'How hard crits hit, as extra damage on top of a normal hit (base +50%).',
-  Thorns: 'Damage dealt back to anyone who hits you.',
-  Pierce: 'Ignores that much of the target\'s Def.',
+  DPS: 'Damage per second.',
+  EHP: 'HP counting Def.',
+  HP: 'Health.',
+  Atk: '+damage per hit.',
+  Def: '−damage per hit. Magic ignores half.',
+  Crit: 'Chance to hit harder.',
+  Haste: 'Attack speed.',
+  Res: 'Shorter debuffs (max 50%).',
+  Steal: 'Heal from damage dealt.',
+  Regen: 'HP per second.',
+  Evade: 'Dodge chance (max 40%).',
+  'Crit dmg': 'Extra crit damage (base +50%).',
+  Thorns: 'Hurts attackers.',
+  Pierce: 'Ignores enemy Def.',
 };
 
 // ---------------------------------------------------------------- weapons
@@ -96,6 +96,15 @@ export const FAMILIES = {
   storm:  { name: 'Storm',  status: 'shock',  set: { name: 'Tempest',     desc: 'Battle start: Frenzy 4s; +8% Haste', stats: { haste: 0.08 },
     trigger: { type: 'battleStart' }, effect: { apply: 'frenzy', duration: 4, target: 'self' } } },
   crystal: { name: 'Crystal', status: 'chill', set: { name: 'Prism',       desc: 'Pierce 4, +10% Resist',           stats: { pen: 4, resist: 0.1 } } },
+  // Sunscorch Desert
+  sand:   { name: 'Sand',   status: 'weaken', set: { name: 'Duneskin',    desc: '+10% Evasion, +5% Crit',          stats: { evasion: 0.1, crit: 0.05 } } },
+  scarab: { name: 'Scarab', status: 'poison', set: { name: 'Carapace',    desc: '+3 Def, +2 Thorns',               stats: { def: 3, thorns: 2 } } },
+  // Barberry Orchard
+  berry:  { name: 'Berry',  status: 'bleed',  set: { name: 'Barbed',      desc: '+4 Thorns, +5% Lifesteal',        stats: { thorns: 4, lifesteal: 0.05 } } },
+  bee:    { name: 'Bee',    status: 'poison', set: { name: 'Hivemind',    desc: '+12% Haste',                      stats: { haste: 0.12 } } },
+  // Frostfang Glacier
+  yeti:   { name: 'Yeti',   status: 'stun',   set: { name: 'Yetiblood',   desc: '+25 HP, +2 Def',                  stats: { hp: 25, def: 2 } } },
+  rime:   { name: 'Rime',   status: 'chill',  set: { name: 'Hoarfrost',   desc: '+20% damage vs Chilled',          mods: { vs: { chill: 0.2 } } } },
 };
 
 // ---------------------------------------------------------------- items
@@ -313,6 +322,66 @@ export const ITEMS = {
     icon: 'top_plate', look: { shape: 'plate', ramp: 'crystal', trim: 'steel' }, flavor: 'Rough outside, dazzling within.' },
   refraction_gem: { name: 'Refraction Gem', slot: 'trinket', family: 'crystal', icon: 't_gem',
     stats: { thorns: 4, resist: 0.1 }, desc: 'Sends part of every blow back.' },
+
+  // ================================================================ Sunscorch Desert
+  // sand: dodge, weaken, crit
+  dune_scimitar: { name: 'Dune Scimitar', slot: 'weapon', type: 'sword', family: 'sand', stats: { evasion: 0.04 },
+    icon: 'sword', ramp: 'sand', onHit: [{ chance: 0.15, apply: 'weaken' }], flavor: 'Curved like the wind made it.' },
+  nomad_wrap: { name: 'Nomad Wrap', slot: 'hat', family: 'sand', stats: { hp: 14, evasion: 0.06 },
+    icon: 'hat_hood', look: { shape: 'hood', ramp: 'sand', trim: 'scarab' }, flavor: 'Keeps the sand out. Mostly.' },
+  sandstrider_boots: { name: 'Sandstrider Boots', slot: 'shoes', family: 'sand', stats: { haste: 0.08, evasion: 0.06 },
+    icon: 'boots', look: { ramp: 'sand', trim: 'leather' }, flavor: 'Never sink, never stop.' },
+  mirage_charm: { name: 'Mirage Charm', slot: 'trinket', family: 'sand', icon: 't_mirage',
+    trigger: { type: 'onDodge' }, effect: { apply: 'weaken' }, desc: 'After a dodge: Weaken the foe.' },
+  // scarab: armour, thorns, poison
+  stinger_dirk: { name: 'Stinger Dirk', slot: 'weapon', type: 'dagger', family: 'scarab',
+    icon: 'dagger', ramp: 'scarab', onHit: [{ chance: 0.25, apply: 'poison' }], flavor: 'Borrowed from a scorpion. Not returned.' },
+  carapace_mail: { name: 'Carapace Mail', slot: 'top', family: 'scarab', stats: { hp: 28, def: 4, thorns: 1 },
+    icon: 'top_scale', look: { shape: 'scale', ramp: 'scarab', trim: 'gold' }, flavor: 'Iridescent. Unbudging.' },
+  scarab_gauntlets: { name: 'Scarab Gauntlets', slot: 'gloves', family: 'scarab', stats: { def: 2, thorns: 2 },
+    icon: 'gloves_spiked', look: { ramp: 'scarab', trim: 'gold' }, flavor: 'Pinch back.' },
+  sun_scarab: { name: 'Sun Scarab', slot: 'trinket', family: 'scarab', icon: 't_scarab',
+    trigger: { type: 'onHitTaken', chance: 0.3 }, effect: { apply: 'poison', stacks: 2 }, desc: 'When hit, 30%: 2 Poison on the attacker.' },
+
+  // ================================================================ Barberry Orchard
+  // berry: thorns, bleed, lifesteal
+  barberry_whip: { name: 'Barberry Lash', slot: 'weapon', type: 'spear', family: 'berry',
+    icon: 'spear', ramp: 'berry', onHit: [{ chance: 0.2, apply: 'bleed' }], flavor: 'Sour, then sharp.' },
+  bramble_vest: { name: 'Bramble Vest', slot: 'top', family: 'berry', stats: { hp: 24, def: 2, thorns: 3 },
+    icon: 'top_vest', look: { shape: 'vest', ramp: 'berry', trim: 'leaf' }, flavor: 'Hug at your own risk.' },
+  thornleaf_gloves: { name: 'Thornleaf Gloves', slot: 'gloves', family: 'berry', stats: { atk: 1, lifesteal: 0.04 },
+    icon: 'gloves', look: { ramp: 'leaf', trim: 'berry' }, flavor: 'Pick berries. Pick fights.' },
+  berry_brooch: { name: 'Berry Brooch', slot: 'trinket', family: 'berry', icon: 't_berry',
+    mods: { vs: { bleed: 0.2 } }, stats: { hp: 10 }, desc: '+20% damage vs Bleeding foes.' },
+  // bee: speed, poison
+  honey_stinger: { name: 'Honey Stinger', slot: 'weapon', type: 'dagger', family: 'bee', stats: { haste: 0.05 },
+    icon: 'dagger', ramp: 'honey', onHit: [{ chance: 0.2, apply: 'poison' }], flavor: 'Sweet talk, sharp point.' },
+  beekeeper_hat: { name: 'Beekeeper Hat', slot: 'hat', family: 'bee', stats: { hp: 12, resist: 0.1 },
+    icon: 'hat_shroom', look: { shape: 'shroom', ramp: 'honey', trim: 'linen' }, flavor: 'The veil is mostly decorative.' },
+  buzzing_boots: { name: 'Buzzing Boots', slot: 'shoes', family: 'bee', stats: { haste: 0.12 },
+    icon: 'boots', look: { ramp: 'honey', trim: 'night' }, flavor: 'Bzz bzz, you are already there.' },
+  honeycomb: { name: 'Honeycomb', slot: 'trinket', family: 'bee', icon: 't_honey',
+    trigger: { type: 'everySeconds', s: 4 }, effect: { heal: 8 }, desc: 'Every 4s: heal 8.' },
+
+  // ================================================================ Frostfang Glacier
+  // yeti: bulk and stuns
+  glacier_maul: { name: 'Glacier Maul', slot: 'weapon', type: 'mace', family: 'yeti', stats: { hp: 10 },
+    icon: 'mace', ramp: 'yeti', flavor: 'An avalanche with a handle.' },
+  fur_mantle: { name: 'Fur Mantle', slot: 'top', family: 'yeti', stats: { hp: 36, def: 2, resist: 0.05 },
+    icon: 'top_cloak', look: { shape: 'cloak', ramp: 'yeti', trim: 'frost' }, flavor: 'Warm as a bear hug.' },
+  yeti_helm: { name: 'Yeti Helm', slot: 'hat', family: 'yeti', stats: { hp: 20, def: 2 },
+    icon: 'hat_horned', look: { shape: 'horned', ramp: 'yeti', trim: 'frost' }, flavor: 'Smells like snow and old wet dog.' },
+  avalanche_bell: { name: 'Avalanche Bell', slot: 'trinket', family: 'yeti', icon: 't_avalanche',
+    trigger: { type: 'everyNthHit', n: 5 }, effect: { apply: 'stun', duration: 0.8 }, desc: 'Every 5th hit: Stun 0.8s.' },
+  // rime: chill and punish it
+  icicle_lance: { name: 'Icicle Lance', slot: 'weapon', type: 'spear', family: 'rime',
+    icon: 'spear', ramp: 'rime', onHit: [{ chance: 0.25, apply: 'chill' }], flavor: 'Colder at the tip.' },
+  rime_gloves: { name: 'Rime Gloves', slot: 'gloves', family: 'rime', stats: { atk: 2, crit: 0.04 },
+    onHit: [{ chance: 0.1, apply: 'chill' }], icon: 'gloves', look: { ramp: 'rime', trim: 'frost' }, flavor: 'Numb fingers, steady hands.' },
+  snowdrift_boots: { name: 'Snowdrift Boots', slot: 'shoes', family: 'rime', stats: { hp: 10, resist: 0.1 },
+    icon: 'boots', look: { ramp: 'rime', trim: 'frost' }, flavor: 'Leave no footprints.' },
+  frost_sigil: { name: 'Frost Sigil', slot: 'trinket', family: 'rime', icon: 't_sigil',
+    trigger: { type: 'battleStart' }, effect: { apply: 'chill', stacks: 2 }, desc: 'Battle start: 2 Chill on the foe.' },
 };
 // Relics: one per elite. Rule-bending trinkets that don't do much alone but
 // can carry a whole build. Never common. `flags` feed the sim directly.
@@ -340,11 +409,21 @@ Object.assign(ITEMS, {
     desc: 'The first time you would fall: rise at 25% HP, cleansed, and Burn the foe.' },
   glass_heart: { name: 'Glass Heart', slot: 'trinket', relic: true, family: null, icon: 'r_glass', tags: [],
     mods: { glass: { out: 0.5, in: 0.25 } }, desc: 'Your hits deal +50% damage. Hits you take deal +25%.' },
+  sunstone_idol: { name: 'Sunstone Idol', slot: 'trinket', relic: true, family: null, icon: 'r_idol', tags: ['poison'],
+    trigger: { type: 'everySeconds', s: 3 }, effect: { detonate: 'poison' }, desc: 'Every 3s: burst all Poison on the foe.' },
+  royal_jelly: { name: 'Royal Jelly', slot: 'trinket', relic: true, family: null, icon: 'r_jelly', tags: ['regen'],
+    flags: { healDamage: 0.5 }, trigger: { type: 'everySeconds', s: 2 }, effect: { heal: 5 },
+    desc: 'Every 2s: heal 5. Half of every heal also hurts the foe.' },
+  heart_of_winter: { name: 'Heart of Winter', slot: 'trinket', relic: true, family: null, icon: 'r_winter', tags: ['chill'],
+    flags: { freezeAt: 2 }, trigger: { type: 'battleStart' }, effect: { apply: 'chill', stacks: 2 },
+    desc: 'Your Chill freezes at 2 stacks. Battle start: 2 Chill on the foe.' },
 });
 export const RELIC_OF = {
   stone_golem: 'gilded_hourglass', cinder_imp: 'plague_censer', king_snapjaw: 'ebb_shell', siren: 'echo_conch',
   rust_titan: 'overclock_core', tesla_sentinel: 'bottled_storm', bone_knight: 'bloodpact_chalice', moor_witch: 'cursed_mirror',
   elder_drake: 'phoenix_feather', prism_colossus: 'glass_heart',
+  sand_wyrm: 'gilded_hourglass', pharaoh_sphinx: 'sunstone_idol', elder_treant: 'bloodpact_chalice', wasp_queen: 'royal_jelly',
+  abominable: 'glass_heart', frost_wyrm: 'heart_of_winter',
 };
 for (const [id, it] of Object.entries(ITEMS)) it.id = id;
 
@@ -471,6 +550,90 @@ Object.assign(MOBS, {
     hp: 250, min: 15, max: 20, interval: 1.7, def: 6, magic: true, onHit: [{ chance: 0.35, apply: 'chill' }], stats: { thorns: 4 },
     triggers: [ab({ type: 'battleStart' }, { shield: 35, target: 'self' }, 'Facets')], trait: 'Magic, Def 6, Chill, Thorns',
     drops: ['prism_rod', 'prism_lance', 'crystal_crown', 'geode_plate', 'refraction_gem'] },
+
+  // ================================================================ one more for each first-five biome
+  shroom_knight: { name: 'Mushroom Knight', tier: 'normal', family: 'spore', sprite: 'shroomknight',
+    hp: 120, min: 8, max: 12, interval: 1.2, def: 3, onHit: [{ chance: 0.3, apply: 'poison' }], trait: 'Def 3, 30% Poison',
+    drops: ['spore_shiv', 'spore_hood', 'spore_boots', 'viper_fang'] },
+  puffer: { name: 'Pufferfish', tier: 'easy', family: 'coral', sprite: 'puffer',
+    hp: 70, min: 3, max: 5, interval: 1.0, def: 1, stats: { thorns: 3 },
+    triggers: [ab({ type: 'hpBelow', pct: 0.5 }, { shield: 12, target: 'self' }, 'Puff up')], trait: 'Thorns 3, puffs up',
+    drops: ['coral_trident', 'shell_helm', 'reef_mail', 'barnacle_ring'] },
+  scrap_hound: { name: 'Scrap Hound', tier: 'normal', family: 'rust', sprite: 'hound',
+    hp: 115, min: 7, max: 10, interval: 0.8, def: 2, onHit: [{ chance: 0.35, apply: 'sunder' }], trait: 'Fast, 35% Sunder',
+    drops: ['rust_cleaver', 'rust_plate', 'oil_gauntlets', 'corroder_lens'] },
+  jack_lantern: { name: 'Jack-o-Lurk', tier: 'easy', family: 'hex', sprite: 'pumpkin',
+    hp: 80, min: 5, max: 7, interval: 1.0, def: 1, magic: true, onHit: [{ chance: 0.35, apply: 'hex' }, { chance: 0.15, apply: 'burn' }],
+    trait: 'Magic, Hex, Burn', drops: ['blightwood_staff', 'witch_hat', 'cursed_doll', 'grave_lantern'] },
+  salamander: { name: 'Lava Salamander', tier: 'normal', family: 'drake', sprite: 'salamander',
+    hp: 140, min: 9, max: 13, interval: 0.9, def: 2, onHit: [{ chance: 0.35, apply: 'burn' }], stats: { evasion: 0.08 },
+    trait: '35% Burn, slippery', drops: ['emberbrand', 'drake_helm', 'scale_mail', 'wyrm_heart'] },
+
+  // ================================================================ Sunscorch Desert
+  dune_skink: { name: 'Dune Skink', tier: 'easy', family: 'sand', sprite: 'skink',
+    hp: 70, min: 4, max: 6, interval: 0.7, def: 0, stats: { evasion: 0.15 }, onHit: [{ chance: 0.2, apply: 'weaken' }],
+    trait: 'Fast, dodges, Weaken', drops: ['dune_scimitar', 'nomad_wrap', 'sandstrider_boots', 'mirage_charm'] },
+  scarab_beetle: { name: 'Scarab Beetle', tier: 'easy', family: 'scarab', sprite: 'beetle',
+    hp: 80, min: 4, max: 6, interval: 1.1, def: 3, onHit: [{ chance: 0.25, apply: 'poison' }], trait: 'Def 3, 25% Poison',
+    drops: ['stinger_dirk', 'carapace_mail', 'scarab_gauntlets', 'sun_scarab'] },
+  dune_scorpion: { name: 'Dune Scorpion', tier: 'normal', family: 'scarab', sprite: 'scorpion',
+    hp: 120, min: 8, max: 11, interval: 1.0, def: 2, onHit: [{ chance: 0.4, apply: 'poison' }], stats: { crit: 0.15 },
+    trait: '40% Poison, 15% Crit', drops: ['stinger_dirk', 'carapace_mail', 'scarab_gauntlets', 'sun_scarab'] },
+  mummy: { name: 'Sand Mummy', tier: 'normal', family: 'sand', sprite: 'mummy',
+    hp: 150, min: 9, max: 13, interval: 1.3, def: 1, regen: 3, onHit: [{ chance: 0.3, apply: 'weaken' }],
+    trait: 'Regen 3/s, Weaken', drops: ['dune_scimitar', 'nomad_wrap', 'sandstrider_boots', 'mirage_charm'] },
+  sand_wyrm: { name: 'Sand Wyrm', tier: 'elite', family: 'sand', sprite: 'sandwyrm',
+    hp: 230, min: 16, max: 22, interval: 1.7, def: 4, onHit: [{ chance: 0.3, apply: 'sunder' }], stats: { evasion: 0.15 },
+    triggers: [ab({ type: 'hpBelow', pct: 0.5 }, { apply: 'frenzy', duration: 5, target: 'self' }, 'Burrow')], trait: 'Def 4, dodges, Sunders',
+    drops: ['dune_scimitar', 'nomad_wrap', 'sandstrider_boots', 'mirage_charm'] },
+  pharaoh_sphinx: { name: 'Pharaoh Sphinx', tier: 'elite', family: 'scarab', sprite: 'sphinx',
+    hp: 190, min: 9, max: 13, interval: 1.1, def: 3, magic: true, onHit: [{ chance: 0.35, apply: 'poison' }, { chance: 0.2, apply: 'hex' }],
+    triggers: [ab({ type: 'battleStart' }, { shield: 30, target: 'self' }, 'Riddle')], trait: 'Magic, Poison, Hex, shield',
+    drops: ['stinger_dirk', 'carapace_mail', 'scarab_gauntlets', 'sun_scarab'] },
+
+  // ================================================================ Barberry Orchard
+  berry_sprout: { name: 'Berry Sprout', tier: 'easy', family: 'berry', sprite: 'sprout',
+    hp: 75, min: 4, max: 6, interval: 1.0, def: 1, regen: 2, onHit: [{ chance: 0.2, apply: 'bleed' }],
+    trait: 'Regen 2/s, Bleed', drops: ['barberry_whip', 'bramble_vest', 'thornleaf_gloves', 'berry_brooch'] },
+  bumble_bee: { name: 'Bumble Bee', tier: 'easy', family: 'bee', sprite: 'bee',
+    hp: 60, min: 3, max: 5, interval: 0.6, def: 0, onHit: [{ chance: 0.25, apply: 'poison' }], stats: { evasion: 0.1 },
+    trait: 'Very fast, Poison', drops: ['honey_stinger', 'beekeeper_hat', 'buzzing_boots', 'honeycomb'] },
+  thorn_hog: { name: 'Thorn Hedgehog', tier: 'normal', family: 'berry', sprite: 'hedgehog',
+    hp: 125, min: 8, max: 11, interval: 1.1, def: 3, stats: { thorns: 4 }, onHit: [{ chance: 0.25, apply: 'bleed' }],
+    trait: 'Thorns 4, Bleed', drops: ['barberry_whip', 'bramble_vest', 'thornleaf_gloves', 'berry_brooch'] },
+  honey_bear: { name: 'Honey Bear', tier: 'normal', family: 'bee', sprite: 'bear',
+    hp: 160, min: 12, max: 16, interval: 1.5, def: 2,
+    triggers: [ab({ type: 'everySeconds', s: 5 }, { heal: 12 }, 'Snack')], trait: 'Big hits, snacks',
+    drops: ['honey_stinger', 'beekeeper_hat', 'buzzing_boots', 'honeycomb'] },
+  elder_treant: { name: 'Elder Treant', tier: 'elite', family: 'berry', sprite: 'treant',
+    hp: 260, min: 15, max: 21, interval: 1.8, def: 5, regen: 4, stats: { thorns: 5 }, onHit: [{ chance: 0.3, apply: 'bleed' }],
+    trait: 'Def 5, Thorns, Regen', drops: ['barberry_whip', 'bramble_vest', 'thornleaf_gloves', 'berry_brooch'] },
+  wasp_queen: { name: 'Wasp Queen', tier: 'elite', family: 'bee', sprite: 'waspqueen',
+    hp: 170, min: 7, max: 10, interval: 0.6, def: 1, onHit: [{ chance: 0.35, apply: 'poison' }], stats: { evasion: 0.12 },
+    triggers: [ab({ type: 'hpBelow', pct: 0.5 }, { apply: 'frenzy', duration: 6, target: 'self' }, 'Swarm')], trait: 'Very fast, Poison, swarms',
+    drops: ['honey_stinger', 'beekeeper_hat', 'buzzing_boots', 'honeycomb'] },
+
+  // ================================================================ Frostfang Glacier
+  snow_puff: { name: 'Snow Puff', tier: 'easy', family: 'rime', sprite: 'snowpuff',
+    hp: 65, min: 4, max: 6, interval: 1.0, def: 0, magic: true, onHit: [{ chance: 0.3, apply: 'chill' }],
+    trait: 'Magic, 30% Chill', drops: ['icicle_lance', 'rime_gloves', 'snowdrift_boots', 'frost_sigil'] },
+  ice_penguin: { name: 'Ice Penguin', tier: 'easy', family: 'yeti', sprite: 'penguin',
+    hp: 85, min: 5, max: 7, interval: 1.2, def: 2, onHit: [{ chance: 0.15, apply: 'stun', duration: 0.6 }],
+    trait: 'Def 2, belly-slide stuns', drops: ['glacier_maul', 'fur_mantle', 'yeti_helm', 'avalanche_bell'] },
+  frost_wolf: { name: 'Frost Wolf', tier: 'normal', family: 'rime', sprite: 'wolf',
+    hp: 120, min: 7, max: 10, interval: 0.8, def: 1, onHit: [{ chance: 0.35, apply: 'chill' }, { chance: 0.15, apply: 'bleed' }],
+    trait: 'Fast, Chill, Bleed', drops: ['icicle_lance', 'rime_gloves', 'snowdrift_boots', 'frost_sigil'] },
+  yeti: { name: 'Yeti', tier: 'normal', family: 'yeti', sprite: 'yeti',
+    hp: 175, min: 12, max: 17, interval: 1.6, def: 3, onHit: [{ chance: 0.2, apply: 'stun', duration: 0.8 }],
+    trait: 'Tough, 20% Stun', drops: ['glacier_maul', 'fur_mantle', 'yeti_helm', 'avalanche_bell'] },
+  abominable: { name: 'Abominable', tier: 'elite', family: 'yeti', sprite: 'abominable',
+    hp: 290, min: 18, max: 25, interval: 1.8, def: 5, onHit: [{ chance: 0.25, apply: 'stun', duration: 0.8 }],
+    triggers: [ab({ type: 'hpBelow', pct: 0.4 }, { apply: 'frenzy', duration: 6, target: 'self' }, 'Roar')], trait: 'Def 5, Stun, enrages',
+    drops: ['glacier_maul', 'fur_mantle', 'yeti_helm', 'avalanche_bell'] },
+  frost_wyrm: { name: 'Frost Wyrm', tier: 'elite', family: 'rime', sprite: 'frostwyrm',
+    hp: 220, min: 12, max: 17, interval: 1.3, def: 3, magic: true, onHit: [{ chance: 0.4, apply: 'chill' }], stats: { resist: 0.2 },
+    triggers: [ab({ type: 'everySeconds', s: 5 }, { shield: 15, target: 'self' }, 'Ice scales')], trait: 'Magic, Chill, ice scales',
+    drops: ['icicle_lance', 'rime_gloves', 'snowdrift_boots', 'frost_sigil'] },
 });
 for (const [id, m] of Object.entries(MOBS)) m.id = id;
 
@@ -478,60 +641,47 @@ for (const [mob, relic] of Object.entries(RELIC_OF)) MOBS[mob].drops.push(relic)
 
 // ---------------------------------------------------------------- days
 
-export const DAYS = [
-  { name: 'Mossy Meadow', biome: 'slime', tiers: {
-    easy: ['green_slime', 'spore_cap'], normal: ['tusk_boar', 'frost_wisp'], elite: ['stone_golem', 'cinder_imp'] } },
-  { name: 'Tidal Shore', biome: 'shore', tiers: {
-    easy: ['snapjaw_crab', 'sting_jelly'], normal: ['reef_eel', 'pearl_oyster'], elite: ['king_snapjaw', 'siren'] } },
-  { name: 'Clockwork Ruins', biome: 'ruins', tiers: {
-    easy: ['cogling', 'rust_mite'], normal: ['arc_sprite', 'clockwork_knight'], elite: ['rust_titan', 'tesla_sentinel'] } },
-  { name: 'Haunted Moor', biome: 'moor', tiers: {
-    easy: ['grave_bat', 'bone_rattler'], normal: ['hex_crow', 'shade_stalker'], elite: ['bone_knight', 'moor_witch'] } },
-  { name: 'Dragon Peak', biome: 'peak', tiers: {
-    easy: ['emberling', 'gale_harpy'], normal: ['crystal_tortoise', 'thunder_roc'], elite: ['elder_drake', 'prism_colossus'] } },
+// Biomes. Each run draws DAYS_IN_RUN of them in a random order, so the same
+// day can be a meadow in one run and a glacier in the next. A biome's monsters
+// are rescaled to whatever day it lands on (see MOB_POWER).
+export const BIOMES = [
+  { id: 'meadow', name: 'Mossy Meadow', biome: 'slime', tiers: {
+    easy: ['green_slime', 'spore_cap'], normal: ['tusk_boar', 'frost_wisp', 'shroom_knight'], elite: ['stone_golem', 'cinder_imp'] } },
+  { id: 'shore', name: 'Tidal Shore', biome: 'shore', tiers: {
+    easy: ['snapjaw_crab', 'sting_jelly', 'puffer'], normal: ['reef_eel', 'pearl_oyster'], elite: ['king_snapjaw', 'siren'] } },
+  { id: 'ruins', name: 'Clockwork Ruins', biome: 'ruins', tiers: {
+    easy: ['cogling', 'rust_mite'], normal: ['arc_sprite', 'clockwork_knight', 'scrap_hound'], elite: ['rust_titan', 'tesla_sentinel'] } },
+  { id: 'moor', name: 'Haunted Moor', biome: 'moor', tiers: {
+    easy: ['grave_bat', 'bone_rattler', 'jack_lantern'], normal: ['hex_crow', 'shade_stalker'], elite: ['bone_knight', 'moor_witch'] } },
+  { id: 'peak', name: 'Dragon Peak', biome: 'peak', tiers: {
+    easy: ['emberling', 'gale_harpy'], normal: ['crystal_tortoise', 'thunder_roc', 'salamander'], elite: ['elder_drake', 'prism_colossus'] } },
+  { id: 'desert', name: 'Sunscorch Desert', biome: 'desert', tiers: {
+    easy: ['dune_skink', 'scarab_beetle'], normal: ['dune_scorpion', 'mummy'], elite: ['sand_wyrm', 'pharaoh_sphinx'] } },
+  { id: 'orchard', name: 'Barberry Orchard', biome: 'orchard', tiers: {
+    easy: ['berry_sprout', 'bumble_bee'], normal: ['thorn_hog', 'honey_bear'], elite: ['elder_treant', 'wasp_queen'] } },
+  { id: 'glacier', name: 'Frostfang Glacier', biome: 'glacier', tiers: {
+    easy: ['snow_puff', 'ice_penguin'], normal: ['frost_wolf', 'yeti'], elite: ['abominable', 'frost_wyrm'] } },
 ];
-export const dayInfo = (round) => DAYS[Math.min(DAYS.length, dayOf(round)) - 1];
+export const BIOME = Object.fromEntries(BIOMES.map((b) => [b.id, b]));
+// The original five-day order, for saves from before biomes were shuffled.
+export const CLASSIC_ORDER = ['meadow', 'shore', 'ruins', 'moor', 'peak'];
+// A run's biome order: `order` is its list of biome ids, one per day.
+export const dayInfo = (round, order = CLASSIC_ORDER) => BIOME[order[Math.min(order.length, dayOf(round)) - 1]];
 
-// Balance: each monster's HP and damage are multiplied by its power, found by
-// tools/tune.mjs so a careful player's build of that day wins about 85% of Easy
-// hunts, 62% of Normal hunts and 42% of Elite hunts. Missing means 1.
-export const MOB_POWER = {
-  stone_golem: 0.89,
-  cinder_imp: 1.19,
-  snapjaw_crab: 1.7,
-  sting_jelly: 1.55,
-  reef_eel: 1.43,
-  pearl_oyster: 1.4,
-  king_snapjaw: 1.04,
-  siren: 1.33,
-  cogling: 1.78,
-  rust_mite: 1.79,
-  arc_sprite: 1.81,
-  clockwork_knight: 1.54,
-  rust_titan: 1.26,
-  tesla_sentinel: 1.48,
-  grave_bat: 1.72,
-  bone_rattler: 1.5,
-  hex_crow: 2.06,
-  shade_stalker: 1.46,
-  bone_knight: 1.13,
-  moor_witch: 1.69,
-  emberling: 1.71,
-  gale_harpy: 1.43,
-  crystal_tortoise: 1.57,
-  thunder_roc: 1.58,
-  elder_drake: 1.1,
-  prism_colossus: 1.09,
-};
-DAYS.forEach((d, i) => {
-  for (const ids of Object.values(d.tiers)) for (const id of ids) MOBS[id].day = i + 1;
+// Balance: each monster's HP and damage are multiplied by its power for the
+// day it's fought on, found by tools/tune.mjs so a careful player's build of
+// that day wins about 62% of Normal hunts and 42% of Elite hunts, and a
+// struggling player's build wins about 80% of Easy hunts. Missing means 1.
+export { MOB_POWER } from './mobpower.js';
+BIOMES.forEach((b) => {
+  for (const ids of Object.values(b.tiers)) for (const id of ids) MOBS[id].biome = b.id;
 });
 
 // Where a family's monsters are fought (and drawn).
 export const FAMILY_BIOME = { slime: 'slime', spore: 'spore', boar: 'boar', wisp: 'wisp', golem: 'golem', imp: 'imp' };
-DAYS.forEach((d, i) => {
+BIOMES.forEach((b, i) => {
   if (i === 0) return;
-  for (const ids of Object.values(d.tiers)) for (const id of ids) FAMILY_BIOME[MOBS[id].family] = d.biome;
+  for (const ids of Object.values(b.tiers)) for (const id of ids) FAMILY_BIOME[MOBS[id].family] = b.biome;
 });
 
 // ---------------------------------------------------------------- rarity

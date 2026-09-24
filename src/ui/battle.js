@@ -25,9 +25,16 @@ const MOB_STYLE = {
   cogling: 'charge', mite: 'lunge', sprite: 'cast', automaton: 'lunge', titan: 'slam', tesla: 'cast',
   bat: 'lunge', skeleton: 'lunge', crow: 'lunge', shade: 'lunge', boneknight: 'slam', witch: 'cast',
   emberling: 'cast', harpy: 'lunge', tortoise: 'slam', roc: 'charge', drake: 'charge', colossus: 'slam',
+  shroomknight: 'charge', puffer: 'hop', hound: 'charge', pumpkin: 'cast', salamander: 'lunge',
+  skink: 'lunge', beetle: 'charge', scorpion: 'lunge', mummy: 'lunge', sandwyrm: 'slam', sphinx: 'cast',
+  sprout: 'hop', bee: 'lunge', hedgehog: 'charge', bear: 'slam', treant: 'slam', waspqueen: 'lunge',
+  snowpuff: 'cast', penguin: 'charge', wolf: 'charge', yeti: 'slam', abominable: 'slam', frostwyrm: 'cast',
 };
 // Bolt colours for casters (and the tint of their swing trails).
-const MOB_COLOR = { wisp: '#9fe0ff', imp: '#f58a3a', siren: '#74e0d0', sprite: '#fff27a', tesla: '#fff27a', witch: '#c07cff', emberling: '#ffc84a' };
+const MOB_COLOR = {
+  wisp: '#9fe0ff', imp: '#f58a3a', siren: '#74e0d0', sprite: '#fff27a', tesla: '#fff27a', witch: '#c07cff', emberling: '#ffc84a',
+  pumpkin: '#ffc84a', sphinx: '#6cc24a', snowpuff: '#c9f3ff', frostwyrm: '#8fd8f0',
+};
 // How close each style gets to its target before striking, in pixels of gap
 // left between them. Ranged styles barely step forward.
 const CLOSE = { dagger: 4, sword: 9, spear: 18, mace: 8, axe: 9, fist: 3, hop: 2, charge: 0, slam: 6, lunge: 4 };
@@ -373,12 +380,40 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       app.querySelector(`#hpn${i}`).textContent = `${s.hp}${s.shield ? `+${s.shield}` : ''}/${max}`;
       hp.classList.toggle('low', pct < 0.3);
       app.querySelector(`#tm${i} .fill`).style.width = `${s.timer * 100}%`;
-      const chips = s.statuses.map(statusChip).join('');
-      const ce = app.querySelector(`#chips${i}`);
-      if (ce._last !== chips) { ce.innerHTML = chips; ce._last = chips; }
+      syncChips(app.querySelector(`#chips${i}`), s.statuses);
       if (s.hp <= 0 && F[i].deadAt === null) die(F[i]);
       F[i].statuses = s.statuses;
     });
+  }
+
+  // Status chips are kept per status and only their count and timer change,
+  // so the pop-in animation plays once when a status lands instead of
+  // restarting every frame (which kept every chip swollen over its neighbour).
+  function syncChips(ce, statuses) {
+    const have = new Map([...ce.children].map((el) => [el.dataset.tipstatus, el]));
+    let prev = null;
+    for (const st of statuses) {
+      let el = have.get(st.id);
+      if (!el) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = statusChip(st);
+        el = tmp.firstElementChild;
+      } else {
+        have.delete(st.id);
+        const n = st.n ? String(st.n) : '';
+        let span = el.querySelector('span');
+        if (n && !span) { span = document.createElement('span'); el.insertBefore(span, el.querySelector('i')); }
+        if (span && span.textContent !== n) {
+          span.textContent = n;
+          span.style.display = n ? '' : 'none';
+        }
+        el.querySelector('i').style.width = `${Math.round(st.frac * 100)}%`;
+      }
+      const want = prev ? prev.nextSibling : ce.firstChild;
+      if (want !== el) ce.insertBefore(el, want);
+      prev = el;
+    }
+    for (const el of have.values()) el.remove();
   }
 
   // KO: three quick flashes, then the sprite bursts into its own pixels.

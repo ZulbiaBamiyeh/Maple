@@ -3,7 +3,7 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, DAYS, dayOf, dayInfo, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind, ROUNDS_PER_DAY,
+  ITEMS, MOBS, BIOMES, CLASSIC_ORDER, DAYS_IN_RUN, dayOf, dayInfo, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind, ROUNDS_PER_DAY,
 } from './data.js';
 import {
   rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot,
@@ -51,6 +51,13 @@ export function archetypeOf(equip) {
   return flavor ? `${flavor} ${type}` : name;
 }
 
+// Which biome each day of a run takes place in: a random draw from the pool,
+// never the same biome twice in one run.
+export function rollBiomes(seed) {
+  const r = new Rng(hash(seed, 'biomes'));
+  return r.shuffle(BIOMES.map((b) => b.id)).slice(0, DAYS_IN_RUN);
+}
+
 export class Run {
   constructor(seed = Math.floor(Math.random() * 1e9), look = null) {
     this.seed = seed;
@@ -72,6 +79,7 @@ export class Run {
     this.loot = null;
     this.lastFight = null;
     this.stats = { dealt: 0, taken: 0, crits: 0, bestHit: 0, healed: 0 };
+    this.biomes = rollBiomes(seed);
     this.rollRound();
   }
 
@@ -87,6 +95,7 @@ export class Run {
     const run = Object.create(Run.prototype);
     const { v, ...rest } = data;
     Object.assign(run, rest, { rng: new Rng(hash(data.seed, 'run', data.round)), lastFight: null });
+    if (!run.biomes) run.biomes = CLASSIC_ORDER.slice(); // saved before biomes were shuffled
     return run;
   }
 
@@ -94,6 +103,8 @@ export class Run {
   get isDuel() { return isDuel(this.round); }
   get day() { return dayOf(this.round); }
   get record() { return `${this.wins}-${this.losses}`; }
+  // Today's biome (or a given round's).
+  dayInfo(round = this.round) { return dayInfo(Math.min(round, ROUNDS), this.biomes); }
 
   build() {
     return { name: this.name, round: this.round, look: this.look, equip: this.equip };
@@ -119,7 +130,7 @@ export class Run {
       };
       this.offers = null;
     } else {
-      const tiers = dayInfo(this.round).tiers;
+      const tiers = this.dayInfo().tiers;
       this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(tiers[t]));
       this.ghost = null;
     }

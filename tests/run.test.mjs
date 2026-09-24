@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Run } from '../src/game.js';
-import { MOBS, BAG_SIZE, LIVES, ROUNDS, DUEL_ROUNDS } from '../src/data.js';
+import { MOBS, ITEMS, BIOMES, BIOME, CLASSIC_ORDER, MOB_POWER, DAYS_IN_RUN, BAG_SIZE, LIVES, ROUNDS, DUEL_ROUNDS } from '../src/data.js';
 
 // A simple player: mostly easy hunts, equips drops that help, bags or leaves the rest.
 function play(run, step) {
@@ -162,4 +162,45 @@ test('a duel win adds to the record but drops no items', () => {
     }
   }
   assert.ok(duelWins >= 3);
+});
+
+test('each run draws its own biome order, with no biome twice', () => {
+  const orders = new Set();
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = new Run(seed);
+    assert.equal(run.biomes.length, DAYS_IN_RUN);
+    assert.equal(new Set(run.biomes).size, DAYS_IN_RUN, `seed ${seed} repeats a biome`);
+    for (const id of run.biomes) assert.ok(BIOME[id], `unknown biome ${id}`);
+    orders.add(run.biomes.join(','));
+  }
+  assert.ok(orders.size > 30, 'biome orders barely vary');
+  // Every biome shows up somewhere, on more than one day.
+  const days = {};
+  for (let seed = 1; seed <= 200; seed++) new Run(seed).biomes.forEach((id, d) => (days[id] = days[id] || new Set()).add(d));
+  for (const b of BIOMES) assert.ok(days[b.id]?.size >= 3, `${b.name} is stuck on too few days`);
+});
+
+test('hunt offers come from the day\'s biome, and saves keep the order', () => {
+  const run = new Run(77);
+  const tiers = run.dayInfo().tiers;
+  for (const id of run.offers) assert.ok(tiers[MOBS[id].tier].includes(id));
+  const back = Run.fromJSON(JSON.parse(JSON.stringify(run)));
+  assert.deepEqual(back.biomes, run.biomes);
+  // Saves from before biomes were shuffled keep the old five-day order.
+  const old = JSON.parse(JSON.stringify(run));
+  delete old.biomes;
+  assert.deepEqual(Run.fromJSON(old).biomes, CLASSIC_ORDER);
+});
+
+test('every biome has monsters for every tier, and every monster has power for every day', () => {
+  for (const b of BIOMES) {
+    for (const t of ['easy', 'normal', 'elite']) {
+      assert.ok(b.tiers[t].length >= 2, `${b.name} has too few ${t} monsters`);
+      for (const id of b.tiers[t]) assert.equal(MOBS[id].tier, t, `${id} is filed under the wrong tier`);
+    }
+    for (const id of Object.values(b.tiers).flat()) {
+      assert.equal(MOB_POWER[id]?.length, DAYS_IN_RUN, `${id} has no power table`);
+      for (const drop of MOBS[id].drops) assert.ok(ITEMS[drop], `${id} drops unknown ${drop}`);
+    }
+  }
 });
