@@ -3,7 +3,7 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, DAYS, dayOf, dayInfo, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind,
+  ITEMS, MOBS, DAYS, dayOf, dayInfo, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind, ROUNDS_PER_DAY,
 } from './data.js';
 import {
   rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot,
@@ -133,7 +133,7 @@ export class Run {
     }
     return {
       id: `me-${this.seed}-${this.round}`, name: `Ghost ${this.name}`, record: this.record, round: this.round,
-      archetype: archetypeOf(this.equip), look: this.look, equip, mine: true, runSeed: this.seed,
+      archetype: archetypeOf(this.equip), look: this.look, equip, mine: true, runSeed: this.seed, perDay: ROUNDS_PER_DAY,
     };
   }
 

@@ -9,6 +9,7 @@ import { toast, closeSheet } from './ui/common.js';
 import { installTooltips } from './ui/tooltip.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
+import { ROUNDS_PER_DAY } from './data.js';
 
 const app = document.getElementById('app');
 installTooltips();
@@ -23,7 +24,8 @@ const starterEquip = {
 
 // Your own past duel builds, newest first, kept per duel round.
 const GHOSTS_PER_ROUND = 6;
-savedGhosts.push(...load('ghosts', []));
+// Only builds from the current day layout: rounds meant something else when days were 3 rounds long.
+savedGhosts.push(...load('ghosts', []).filter((g) => g.perDay === ROUNDS_PER_DAY));
 function keepGhost(run) {
   if (seedParam) return;
   const g = run.snapshot();
@@ -40,7 +42,7 @@ const RESUMABLE = new Set(['pick', 'gear', 'loot', 'end']);
 
 function readSave() {
   const data = load('run');
-  if (!data) return null;
+  if (!data || data.perDay !== ROUNDS_PER_DAY) return null; // saved under an older day layout
   const run = Run.fromJSON(data.run);
   if (!run) return null;
   return { run, screen: data.screen, opts: data.opts || {}, name: run.name, round: run.round };
@@ -126,7 +128,7 @@ function startFight(mobId) {
   const out = run.resolve();
   const next = run.over ? 'end' : run.loot ? 'loot' : 'gear';
   // Save the outcome now, pointing at the screen that follows the battle.
-  if (!seedParam) save('run', { run, screen: next, opts: next === 'gear' ? { mode: 'hub' } : {} });
+  if (!seedParam) save('run', { run, screen: next, opts: next === 'gear' ? { mode: 'hub' } : {}, perDay: ROUNDS_PER_DAY });
   if (run.over) recordBest(run);
   ctx.screen = 'battle';
   ctx.opts = { fight, out, before };
@@ -166,7 +168,7 @@ function persist() {
   if (seedParam) return; // seeded test runs don't touch the real save
   if (!ctx.run) return;
   if (RESUMABLE.has(ctx.screen)) {
-    save('run', { run: ctx.run, screen: ctx.screen, opts: { mode: ctx.opts.mode } });
+    save('run', { run: ctx.run, screen: ctx.screen, opts: { mode: ctx.opts.mode }, perDay: ROUNDS_PER_DAY });
   }
 }
 
