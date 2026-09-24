@@ -1,0 +1,475 @@
+// The run: 5 days of three hunts and a duel, 3 lives. Holds all run state and the
+// actions the screens call. No DOM in here.
+
+import { Rng, hash } from './rng.js';
+import {
+  ITEMS, MOBS, BIOMES, CLASSIC_ORDER, DAYS_IN_RUN, dayOf, dayInfo, slotOf, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind,
+  ROUNDS_PER_DAY, RARITIES, KEYSTONES, GOLD_WIN, GOLD_DUEL_LOSS, SELL_PRICE, SHOP_AFTER_DAYS, SHOP_PRICE, KEYSTONE_MARKUP, SHOP_REROLL,
+  REROLLS_PER_DAY, WIN_TARGET,
+} from './data.js';
+import { GHOST_POWER } from './mobpower.js';
+import { planEvents } from './events.js';
+import {
+  rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot, rollRarity, rollPerk, setCounts,
+} from './items.js';
+import { simulate } from './sim.js';
+import { GIRL_HAIR, BOY_HAIR } from './art/hero.js';
+import { HAIR, SKIN, EYES } from './art/palette.js';
+
+const GIRL_NAMES = ['Mira', 'Luna', 'Suri', 'Nell', 'Ivy', 'Rin', 'Aya', 'Tove', 'Pia', 'Wren'];
+const BOY_NAMES = ['Kai', 'Theo', 'Ren', 'Oli', 'Juno', 'Sol', 'Finn', 'Arlo', 'Ezra', 'Tam'];
+
+export function randomLook(rng) {
+  const gender = rng.chance(0.5) ? 'girl' : 'boy';
+  return {
+    gender,
+    hair: rng.pick(gender === 'girl' ? GIRL_HAIR : BOY_HAIR),
+    hairColor: rng.pick(Object.keys(HAIR)),
+    skin: rng.pick(Object.keys(SKIN)),
+    eyes: rng.pick(Object.keys(EYES)),
+    name: rng.pick(gender === 'girl' ? GIRL_NAMES : BOY_NAMES),
+  };
+}
+
+// Hand-written rivals' gear rolls at the duel's own numbers: with three hunts
+// a day, players arrive about as geared up as they are. (Saved player builds
+// keep their own rolls.)
+export const isDuel = (round) => DUEL_ROUNDS.includes(round);
+
+// Builds saved from earlier runs on this device, fought alongside the
+// hand-written ghosts. main.js fills this from storage at startup.
+export const savedGhosts = [];
+
+// A label like "Poison dagger" or "Sword" from what a build wears.
+export function archetypeOf(equip) {
+  const w = equip.weapon ? ITEMS[equip.weapon.item] : null;
+  const type = w ? w.type : 'fists';
+  const fams = {};
+  for (const inst of Object.values(equip)) {
+    const f = inst && ITEMS[inst.item].family;
+    if (f) fams[f] = (fams[f] || 0) + 1;
+  }
+  const top = Object.entries(fams).sort((a, b) => b[1] - a[1])[0];
+  const flavor = top && top[1] >= 2 ? { slime: 'Gel', spore: 'Poison', boar: 'Bleed', wisp: 'Frost', golem: 'Stone', imp: 'Ember' }[top[0]] : null;
+  const name = type[0].toUpperCase() + type.slice(1);
+  return flavor ? `${flavor} ${type}` : name;
+}
+
+export const sellPrice = (inst) => SELL_PRICE[inst.rarity] ?? 1;
+
+// A duel rival, scaled by that day's GHOST_POWER (HP and weapon damage) so
+// duels keep pace with players who shop and merge. See tools/tune-duels.mjs.
+export function duelFighter(ghost, round) {
+  const f = heroFighter({ name: ghost.name, round, look: ghost.look, equip: ghost.equip });
+  const p = GHOST_POWER[dayOf(round) - 1] ?? 1;
+  f.maxHp = Math.round(f.maxHp * p);
+  f.weapon = { ...f.weapon, min: Math.round(f.weapon.min * p), max: Math.round(f.weapon.max * p) };
+  return f;
+}
+// Relics stay one of a kind; everything else can rank up to Epic.
+export const canRankUp = (inst) => inst.rarity !== 'epic' && !ITEMS[inst.item].relic;
+
+// Which biome each day of a run takes place in: a random draw from the pool,
+// never the same biome twice in one run.
+export function rollBiomes(seed) {
+  const r = new Rng(hash(seed, 'biomes'));
+  return r.shuffle(BIOMES.map((b) => b.id)).slice(0, DAYS_IN_RUN);
+}
+
+export class Run {
+  constructor(seed = Math.floor(Math.random() * 1e9), look = null) {
+    this.seed = seed;
+    this.rng = new Rng(hash(seed, 'run'));
+    this.look = look || randomLook(this.rng);
+    this.round = 1;
+    this.lives = LIVES;
+    this.wins = 0;
+    this.losses = 0;
+    this.crown = false;
+    this.over = false;
+    this.history = [];
+    this.equip = Object.fromEntries(SLOTS.map((s) => [s, null]));
+    this.equip.weapon = rollInstance('wooden_sword', 'common', 1, this.rng);
+    this.equip.top = rollInstance('linen_shirt', 'common', 1, this.rng);
+    this.bag = [];
+    this.offers = null;
+    this.ghost = null;
+    this.loot = null;
+    this.lastFight = null;
+    this.stats = { dealt: 0, taken: 0, crits: 0, bestHit: 0, healed: 0 };
+    this.biomes = rollBiomes(seed);
+    this.duelWins = 0;
+    this.gold = 0;
+    this.rerolls = REROLLS_PER_DAY;
+    this.shop = null;
+    this.shopRolls = 0;
+    this.eventPlan = planEvents(this.seed);
+    this.event = null;
+    // Run-wide changes from events: curses and blessings on max HP.
+    this.boons = { hpMult: 1, hpFlat: 0 };
+    this.rollRound();
+  }
+
+  // ---- save / restore (everything except the replay of the last fight)
+
+  toJSON() {
+    const { rng, lastFight, ...rest } = this;
+    return { v: 1, ...rest };
+  }
+
+  static fromJSON(data) {
+    if (!data || data.v !== 1) return null;
+    const run = Object.create(Run.prototype);
+    const { v, ...rest } = data;
+    Object.assign(run, rest, { rng: new Rng(hash(data.seed, 'run', data.round)), lastFight: null });
+    if (!run.biomes) run.biomes = CLASSIC_ORDER.slice(); // saved before biomes were shuffled
+    run.duelWins ??= run.history.filter((h) => h.duel && h.result === 'W').length;
+    run.gold ??= 0;
+    run.rerolls ??= REROLLS_PER_DAY;
+    run.shop ??= null;
+    run.shopRolls ??= 0;
+    run.eventPlan ??= planEvents(run.seed).filter((e) => e.round > run.round);
+    run.event ??= null;
+    run.boons ??= { hpMult: 1, hpFlat: 0 };
+    return run;
+  }
+
+  get name() { return this.look.name; }
+  get isDuel() { return isDuel(this.round); }
+  get day() { return dayOf(this.round); }
+  get record() { return `${this.wins}-${this.losses}`; }
+  // Today's biome (or a given round's).
+  dayInfo(round = this.round) { return dayInfo(Math.min(round, ROUNDS), this.biomes); }
+
+  build() {
+    return { name: this.name, round: this.round, look: this.look, equip: this.equip };
+  }
+  fighter(equip = this.equip) {
+    const f = heroFighter({ name: this.name, round: this.round, look: this.look, equip });
+    const b = this.boons;
+    if (b && (b.hpMult !== 1 || b.hpFlat)) f.maxHp = Math.max(1, Math.round(f.maxHp * b.hpMult) + b.hpFlat);
+    return f;
+  }
+  headline(equip = this.equip) {
+    return headline(this.fighter(equip));
+  }
+
+  // One mob per tier for hunts; a ghost from this round's pool for duels.
+  rollRound() {
+    const r = new Rng(hash(this.seed, this.round, 'offers'));
+    if (this.isDuel) {
+      const pool = GHOSTS.filter((g) => g.round === this.round);
+      // Past builds of yours from this round, when there are any, show up half the time.
+      const mine = savedGhosts.filter((g) => g.round === this.round && g.runSeed !== this.seed);
+      const gh = mine.length && r.chance(0.5) ? r.pick(mine) : r.pick(pool);
+      this.ghost = {
+        ...gh,
+        equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round, 0) : null])),
+      };
+      this.offers = null;
+    } else {
+      const tiers = this.dayInfo().tiers;
+      this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(tiers[t]));
+      this.ghost = null;
+    }
+  }
+
+  // This build as a ghost for future runs: look, record and item rolls.
+  snapshot() {
+    const equip = {};
+    for (const [s, inst] of Object.entries(this.equip)) {
+      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes, perks: inst.perks || [] };
+    }
+    return {
+      id: `me-${this.seed}-${this.round}`, name: `Ghost ${this.name}`, record: this.record, round: this.round,
+      archetype: archetypeOf(this.equip), look: this.look, equip, mine: true, runSeed: this.seed, perDay: ROUNDS_PER_DAY,
+    };
+  }
+
+  ghostFighter() {
+    return duelFighter(this.ghost, this.round);
+  }
+
+  // Estimated chance to win against a fighter spec, from a handful of practice
+  // fights on seeds the real fight never uses. Draws count as half.
+  odds(foe, equip = this.equip, n = 24) {
+    const me = this.fighter(equip);
+    let score = 0;
+    for (let k = 0; k < n; k++) {
+      const w = simulate(me, foe, hash(this.seed, this.round, 'preview', k)).winner;
+      score += w === 0 ? 1 : w === -1 ? 0.5 : 0;
+    }
+    return score / n;
+  }
+  mobOdds(mobId, equip) { return this.odds(mobFighter(mobId, this.round), equip); }
+
+  // Run the fight for this round. target: mob id for hunts, ignored for duels.
+  fight(mobId) {
+    const seed = hash(this.seed, this.round);
+    const me = this.fighter();
+    const foe = this.isDuel ? this.ghostFighter() : mobFighter(mobId, this.round);
+    const result = simulate(me, foe, seed);
+    this.lastFight = { mobId, result, me, foe, duel: this.isDuel };
+    return this.lastFight;
+  }
+
+  // Apply the outcome of lastFight. Returns a summary for the result banner.
+  resolve() {
+    const { result, mobId, duel } = this.lastFight;
+    const won = result.winner === 0;
+    const draw = result.winner === -1;
+    const out = { won, draw, duel, lifeLost: false, gold: 0 };
+    const label = duel ? this.ghost.name : MOBS[mobId].name;
+    this.tally(result);
+    if (won) {
+      this.wins++;
+      out.gold = duel ? GOLD_WIN.duel : GOLD_WIN[MOBS[mobId].tier];
+      // Duels pay out a win and gold, never items: gear only comes from hunts and the shop.
+      if (duel) {
+        this.loot = null;
+        this.duelWins++;
+        if (this.duelWins >= WIN_TARGET) this.crown = true;
+      } else {
+        const lr = new Rng(hash(this.seed, this.round, 'loot'));
+        const m = MOBS[mobId];
+        this.loot = rollLoot(m.drops, m.tier, this.round, lr, false, this.day);
+      }
+    } else if (!draw) {
+      // Hunts are for loot: losing one just means no drop. Only duels cost a life.
+      this.losses++;
+      if (duel) {
+        this.lives--;
+        out.lifeLost = true;
+        out.gold = GOLD_DUEL_LOSS;
+      }
+      this.loot = null;
+    } else {
+      this.loot = null;
+    }
+    this.gold += out.gold;
+    this.history.push({ round: this.round, duel, label, result: won ? 'W' : draw ? 'D' : 'L' });
+    if (this.crown || this.lives <= 0 || (this.round === ROUNDS && !this.loot)) this.over = true;
+    // A planned event waits after this hunt.
+    const plan = !duel && !this.over && this.eventPlan.find((e) => e.round === this.round);
+    if (plan) {
+      this.event = { id: plan.id, round: this.round, result: null };
+      out.event = true;
+    }
+    // The merchant sets up after some duels.
+    if (duel && !this.over && SHOP_AFTER_DAYS.includes(this.day)) {
+      this.shopRolls = 0;
+      this.rollShop();
+      out.shop = true;
+    }
+    return out;
+  }
+
+  // Lifetime numbers for the end screen.
+  tally(result) {
+    const st = this.stats;
+    for (const e of result.events) {
+      if (e.type === 'hit' && e.src === 0) {
+        st.dealt += e.dmg;
+        if (e.crit) st.crits++;
+        st.bestHit = Math.max(st.bestHit, e.dmg);
+      } else if (e.type === 'hit' && e.src === 1) st.taken += e.dmg;
+      else if (e.type === 'dot') { if (e.dst === 1) st.dealt += e.dmg; else st.taken += e.dmg; }
+      else if (e.type === 'heal' && e.dst === 0) st.healed += e.amt;
+    }
+  }
+
+  // ---- inventory
+
+  bagFull() { return this.bag.length >= BAG_SIZE; }
+
+  slotFor(inst) {
+    const kind = slotKind(ITEMS[inst.item].slot);
+    if (kind !== 'trinket') return kind;
+    if (!this.equip.trinket1) return 'trinket1';
+    if (!this.equip.trinket2) return 'trinket2';
+    return 'trinket1';
+  }
+
+  // Equipment with `inst` placed in `slot`, for previews.
+  withItem(inst, slot = this.slotFor(inst)) {
+    return { ...this.equip, [slot]: inst };
+  }
+
+  // Take a loot pick. action: 'equip' | 'bag' | 'discard'. slot optional for trinkets.
+  // Equipping over a piece moves it to the bag, or discards it if the bag is full.
+  takeLoot(inst, action, slot) {
+    if (!this.place(inst, action, slot)) return false;
+    this.loot = null;
+    if (this.round === ROUNDS) this.over = true;
+    return true;
+  }
+
+  // Put a new item somewhere. action: 'equip' | 'bag' | 'discard'.
+  // Equipping over a piece moves it to the bag, or sells it if the bag is full.
+  place(inst, action, slot) {
+    if (action === 'discard') return true;
+    if (action === 'bag') {
+      if (this.bagFull()) return false;
+      this.bag.push(inst);
+      return true;
+    }
+    slot = slot || this.slotFor(inst);
+    const old = this.equip[slot];
+    this.equip[slot] = inst;
+    if (old) {
+      if (!this.bagFull()) this.bag.push(old);
+      else this.gold += sellPrice(old);
+    }
+    return true;
+  }
+
+  // ---- loot reroll: one a day
+
+  rerollLoot() {
+    if (!this.loot || this.rerolls <= 0 || this.lastFight?.duel) return false;
+    this.rerolls--;
+    const m = MOBS[this.lastFight.mobId];
+    const lr = new Rng(hash(this.seed, this.round, 'loot', 'reroll', this.rerolls));
+    this.loot = rollLoot(m.drops, m.tier, this.round, lr, false, this.day);
+    return true;
+  }
+
+  // ---- gold and the shop
+
+  sell(uid) {
+    const inst = this.find(uid);
+    if (!inst) return 0;
+    const g = sellPrice(inst);
+    this.discard(uid);
+    this.gold += g;
+    return g;
+  }
+
+  // Five wares, each with a reason to want it: pieces for sets you've started,
+  // a twin of something you own (to merge), a keystone, and a taste of tomorrow.
+  rollShop() {
+    const r = new Rng(hash(this.seed, this.round, 'shop', this.shopRolls));
+    const owned = [...this.bag, ...Object.values(this.equip)].filter(Boolean);
+    const ownedIds = new Set(owned.map((i) => i.item));
+    const round = this.round + 1;
+    const rar = () => rollRarity('normal', r, false, this.day);
+    const wares = [];
+    const add = (id, why, rarity = rar()) => {
+      if (!id) return;
+      if ((ITEMS[id].relic || ITEMS[id].keystone) && rarity === 'common') rarity = 'rare';
+      const inst = rollInstance(id, rarity, round, r);
+      const price = SHOP_PRICE[rarity] + (ITEMS[id].keystone ? KEYSTONE_MARKUP : 0);
+      wares.push({ inst, price, sold: false, why });
+    };
+    // families you've started, most pieces first
+    const counts = setCounts(Object.fromEntries(owned.map((i, k) => [k, i])));
+    const fams = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    const missing = fams.flatMap((f) => Object.keys(ITEMS).filter((id) => ITEMS[id].family === f && !ownedIds.has(id)));
+    const setPicks = r.shuffle(missing).slice(0, 2);
+    for (const id of setPicks) add(id, 'Set');
+    // a twin to merge
+    const twinable = owned.filter((i) => canRankUp(i));
+    if (twinable.length) {
+      const t = r.pick(twinable);
+      add(t.item, 'Twin', t.rarity);
+    }
+    // a keystone you don't have
+    add(r.pick(KEYSTONES.filter((id) => !ownedIds.has(id))), 'Keystone');
+    // tomorrow's biome
+    const next = this.dayInfo(round);
+    const pool = [...new Set(Object.values(next.tiers).flat().flatMap((m) => MOBS[m].drops))].filter((id) => !ITEMS[id].relic && !ITEMS[id].keystone);
+    while (wares.length < 5) add(r.pick(pool), 'Tomorrow');
+    this.shop = wares;
+  }
+
+  buy(i, action, slot) {
+    const w = this.shop?.[i];
+    if (!w || w.sold || this.gold < w.price) return false;
+    if (action === 'bag' && this.bagFull()) return false;
+    this.gold -= w.price;
+    w.sold = true;
+    this.place(w.inst, action, slot);
+    return true;
+  }
+
+  rerollShop() {
+    if (!this.shop || this.gold < SHOP_REROLL) return false;
+    this.gold -= SHOP_REROLL;
+    this.shopRolls++;
+    this.rollShop();
+    return true;
+  }
+
+  leaveShop() { this.shop = null; }
+  endEvent() { this.event = null; }
+
+  // ---- merging: two of the same item at the same rarity make one a rank up
+
+  twinOf(inst) {
+    if (!inst || !canRankUp(inst)) return null;
+    const all = [...this.bag, ...Object.values(this.equip)].filter(Boolean);
+    return all.find((x) => x.uid !== inst.uid && x.item === inst.item && x.rarity === inst.rarity) || null;
+  }
+
+  merge(uid) {
+    const a = this.find(uid);
+    const b = this.twinOf(a);
+    if (!b) return null;
+    const r = new Rng(hash(this.seed, 'merge', a.uid, b.uid));
+    const rarity = RARITIES[a.rarity].next;
+    const fresh = rollInstance(a.item, rarity, Math.max(a.round, b.round), r);
+    // Keep the better parent's affixes, fill up to the new rarity's count.
+    const kept = [...(a.affixes || []), ...(b.affixes || [])];
+    fresh.affixes = [...kept, ...fresh.affixes].filter((x, k, arr) => arr.findIndex((y) => y.stat === x.stat) === k)
+      .slice(0, RARITIES[rarity].affixes);
+    // Keep their perks, and a merged item always has at least one.
+    const perks = [...new Set([...(a.perks || []), ...(b.perks || []), ...fresh.perks])].slice(0, 2);
+    if (!perks.length) perks.push(rollPerk(ITEMS[a.item], r));
+    fresh.perks = perks;
+    // The merged item takes an equipped parent's slot, else the bag.
+    const slot = SLOTS.find((s) => this.equip[s]?.uid === a.uid || this.equip[s]?.uid === b.uid);
+    this.discard(a.uid);
+    this.discard(b.uid);
+    if (slot) this.equip[slot] = fresh;
+    else this.bag.push(fresh);
+    return fresh;
+  }
+
+  equipFromBag(uid, slot) {
+    const i = this.bag.findIndex((x) => x.uid === uid);
+    if (i < 0) return;
+    const inst = this.bag[i];
+    slot = slot || this.slotFor(inst);
+    const old = this.equip[slot];
+    this.equip[slot] = inst;
+    if (old) this.bag[i] = old;
+    else this.bag.splice(i, 1);
+  }
+
+  unequip(slot) {
+    if (!this.equip[slot] || this.bagFull()) return false;
+    this.bag.push(this.equip[slot]);
+    this.equip[slot] = null;
+    return true;
+  }
+
+  // Throw an item away (from the bag or off the hero) to make room.
+  discard(uid) {
+    this.bag = this.bag.filter((x) => x.uid !== uid);
+    for (const s of SLOTS) if (this.equip[s]?.uid === uid) this.equip[s] = null;
+  }
+
+  find(uid) {
+    return this.bag.find((x) => x.uid === uid) || Object.values(this.equip).find((x) => x?.uid === uid);
+  }
+
+  next() {
+    if (this.over) return;
+    this.round++;
+    this.shop = null;
+    if (slotOf(this.round) === 1) this.rerolls = REROLLS_PER_DAY;
+    this.lastFight = null;
+    this.loot = null;
+    this.rollRound();
+  }
+}
