@@ -5,6 +5,7 @@ A phone auto-battler about loot. Choose which monster to hunt, equip what it dro
 This is prototype v0.1, built to the design manuscript in [docs/gearfall-design.md](docs/gearfall-design.md).
 
 > The previous project in this repo (Lantern Row) is parked, unused, in [`backup/lantern-row/`](backup/lantern-row/).
+> The shop, scrolls and gold are parked in [`backup/gearfall-shop-scrolls/`](backup/gearfall-shop-scrolls/).
 
 ## Play it
 
@@ -34,12 +35,10 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 | **Odds** | Hunt cards show your chances against each monster with your current gear, in five bands from Deadly to Easy win. They come from practice fights on seeds the real fight never uses. Duels show no odds and no gear, so you can't solve a rival before fighting them. |
 | **Your ghosts** | Entering a duel saves your build on this device. Later runs can match you against your past builds (half the time, when one exists for that round), alongside the hand-written rivals. |
 | **Saving** | The run auto-saves on this device, and the title screen offers Continue. A fight's result is locked in before it plays, so reloading mid-battle can't undo a loss. The game also remembers your battle speed, best record and the tips you've seen. |
-| **Economy** | Wins pay gold: 1 for Easy, 2 for Normal, 3 for Elite and 3 for a duel. A loss pays 2. Scrapping pays by rarity. Gold is spent at the shop. |
-| **Shop** | A wandering merchant sets up before every duel (rounds 3, 6 and 9). Each visit offers 4 rarity-rolled wares from a shop-only stock: Iron Sword, Twin Fang, Oak Staff, Leather Cap, Chain Mail, Brawler Wraps, Swift Boots, Guard Charm, Berserker Band, Iron Heart and Mending Pendant. It also sells the three scrolls, which can only be used there. |
 | **Phone layout** | Every screen fits one phone screen with no scrolling, down to 375×667. Each layout's flexible part (card list, hero stage, arena) takes the leftover height, sprites pick the largest whole-number scale that fits, and action buttons sit at the bottom within thumb reach. |
 | **Help** | A short popup the first time each screen appears, and no permanent tutorial text. The ≡ menu has How to play (every stat and status explained), Show intro popups again, and Abandon run. |
 | **Readability** | Status chips have stack counts and draining timers. Damage numbers are colour-coded, and an attack-timer bar sits under each HP bar. After every fight a breakdown shows who dealt what, split into hits, crits, burn, poison, bleed and thorns. |
-| **Gear** | 30 items: 7 weapons, 4 hats, 4 tops, 2 gloves, 2 shoes, and 10 trinkets. Items come in 3 rarities with affixes. Wearing 2 pieces from one mob family unlocks its set bonus. There are 3 scroll types, and every item has 3 upgrade slots. |
+| **Gear** | Items come in 3 rarities with affixes. Wearing 2 pieces from one mob family unlocks its set bonus. There's a 6-slot bag; you can discard pieces to make room. The shop, scrolls and gold are parked in `backup/gearfall-shop-scrolls/`. |
 | **Comparisons** | Every item sheet shows `DPS a → b ▲` and `EHP a → b ▼` against what you're wearing now. |
 
 ## Art

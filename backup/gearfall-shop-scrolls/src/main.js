@@ -4,7 +4,7 @@
 import { Run, randomLook, savedGhosts } from './game.js';
 import { Rng } from './rng.js';
 import { showBattle } from './ui/battle.js';
-import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
+import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, shopScreen, menuSheet, buildSheet } from './ui/screens.js';
 import { toast, closeSheet } from './ui/common.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
@@ -34,7 +34,7 @@ function keepGhost(run) {
 }
 
 // Screens that are safe to resume on. A battle resumes on whatever comes after it.
-const RESUMABLE = new Set(['pick', 'gear', 'loot', 'end']);
+const RESUMABLE = new Set(['pick', 'gear', 'loot', 'shop', 'end']);
 
 function readSave() {
   const data = load('run');
@@ -81,8 +81,6 @@ const ctx = {
     ctx.run = sv.run;
     ctx.saved = null;
     if (ctx.run.over) return ctx.go('end');
-    // Saves from older versions may point at screens that no longer exist.
-    if (!RESUMABLE.has(sv.screen)) return ctx.go(ctx.run.isDuel ? 'gear' : 'pick', ctx.run.isDuel ? { mode: 'duel' } : {});
     ctx.go(sv.screen, sv.opts);
   },
   newRun() {
@@ -108,16 +106,18 @@ const ctx = {
     if (ctx.run.over) return finishRun();
     ctx.go('gear', { mode: 'hub' });
   },
+  // A duel round opens with the shop, then the duel preview.
   nextRound() {
     ctx.run.next();
-    ctx.go(ctx.run.isDuel ? 'gear' : 'pick', ctx.run.isDuel ? { mode: 'duel' } : {});
+    ctx.go(ctx.run.isDuel ? 'shop' : 'pick');
   },
+  leaveShop() { ctx.go('gear', { mode: 'duel' }); },
   openMenu() { menuSheet(ctx); },
 };
 
 function startFight(mobId) {
   const run = ctx.run;
-  const before = { lives: run.lives, history: run.history.slice() };
+  const before = { lives: run.lives, gold: run.gold, history: run.history.slice() };
   // Entering a duel saves your build as a ghost for future runs.
   if (run.isDuel) keepGhost(run);
   const fight = run.fight(mobId);
@@ -136,7 +136,8 @@ function startFight(mobId) {
 function afterBattle() {
   const run = ctx.run;
   const { out } = ctx.opts;
-  if (out.lifeLost) toast('−1 life', 'bad');
+  if (out.lifeLost) toast(`−1 life · +${out.gold} gold`, 'bad');
+  else if (out.won && out.gold) toast(`+${out.gold} gold`, 'gold');
   if (out.draw) toast('Draw — no life lost');
   if (run.over) return ctx.go('end');
   if (run.loot) return ctx.go('loot');

@@ -57,10 +57,7 @@ if (await pg.$('[data-loot]')) {
 }
 // play on greedily: always hunt the easy mob, equip loot, until a duel
 for (let i = 0; i < 60; i++) {
-  if (await pg.$('#leave')) {
-    await shot('06b-shop');
-    await pg.click('#leave');
-  } else if (await pg.$('#primary')) {
+  if (await pg.$('#primary')) {
     const label = await pg.textContent('#primary');
     if (label.includes('Fight')) { await shot('07-duel-preview'); await pg.click('#primary'); await pg.waitForTimeout(2200); await shot('07b-duel-battle', false); }
     else await pg.click('#primary');

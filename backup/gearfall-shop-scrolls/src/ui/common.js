@@ -64,7 +64,8 @@ export function mountScenes(root) {
 
 export function tile(inst, { size = 2, attrs = '', label = '', extra = '' } = {}) {
   if (!inst) return `<div class="tile empty ${extra}" ${attrs}><span class="slotlabel">${label}</span></div>`;
-  return `<div class="tile r-${inst.rarity} ${extra}" ${attrs}>${iconImg(inst.item, size)}</div>`;
+  const up = inst.upgrades?.bonus ? `<span class="up">+${inst.upgrades.bonus}</span>` : '';
+  return `<div class="tile r-${inst.rarity} ${inst.glow ? 'glow' : ''} ${extra}" ${attrs}>${iconImg(inst.item, size)}${up}</div>`;
 }
 
 export const itemName = (inst) => ITEMS[inst.item].name;
@@ -76,7 +77,9 @@ export const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
 export function hud(run) {
   const lostNow = run._shownLives !== undefined && run.lives < run._shownLives;
+  const goldBump = run._shownGold !== undefined && run.gold !== run._shownGold;
   run._shownLives = run.lives;
+  run._shownGold = run.gold;
   const hearts = [0, 1, 2].map((i) => `<span class="hrt ${lostNow && i === run.lives ? 'break' : ''}">${glyph(i < run.lives ? 'heart' : 'heartLost', 3)}</span>`).join('');
   const pips = [];
   const byRound = Object.fromEntries(run.history.map((h) => [h.round, h.result]));
@@ -88,7 +91,8 @@ export function hud(run) {
   return `<header class="hud">
     <div class="lives" aria-label="${run.lives} lives">${hearts}</div>
     <div><div class="pips">${pips.join('')}</div><div class="round-label">ROUND ${run.round}/${ROUNDS} · ${run.isDuel ? 'DUEL' : 'HUNT'}</div></div>
-    <div class="hud-r"><button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button></div>
+    <div class="hud-r"><div class="gold ${goldBump ? 'bump' : ''}">${glyph('coin', 3)}<span>${run.gold}</span></div>
+    <button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button></div>
   </header>`;
 }
 

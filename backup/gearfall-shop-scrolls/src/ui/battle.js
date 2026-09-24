@@ -553,10 +553,11 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const cls = w === 0 ? 'win' : w === 1 ? 'loss' : 'draw';
     const secs = (result.ticks / TPS).toFixed(1);
     const reason = result.reason === 'time' ? ' · time up, higher HP% wins' : '';
+    const pay = out?.gold ? ` · <span style="color:var(--gold)">+${out.gold} gold</span>` : '';
     const life = out?.lifeLost ? ' · <span style="color:#ff6b76">−1 life</span>' : '';
     const ban = document.createElement('div');
     ban.className = 'banner';
-    ban.innerHTML = `<div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}${life}</div>`;
+    ban.innerHTML = `<div class="t ${cls}">${title}</div><div class="sub">${secs}s${reason}${pay}${life}</div>`;
     arena.append(ban);
     const why = document.createElement('div');
     why.className = 'why panel';

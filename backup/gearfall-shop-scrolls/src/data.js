@@ -7,6 +7,9 @@ export const BAG_SIZE = 6;
 export const LIVES = 3;
 export const ROUNDS = 9;
 export const DUEL_ROUNDS = [3, 6, 9];
+// Gold for a win, by what you beat. Losses pay 2 as consolation.
+export const GOLD_WIN = { easy: 1, normal: 2, elite: 3, duel: 3 };
+export const GOLD_LOSS = 2;
 
 export const scaleFor = (round) => 1 + 0.12 * (round - 1);
 
@@ -128,12 +131,46 @@ export const ITEMS = {
     trigger: { type: 'onCrit' }, effect: { apply: 'sunder' }, desc: 'On crit: Sunder.' },
   vampire_tooth: { name: 'Vampire Tooth', slot: 'trinket', family: null, icon: 't_tooth',
     stats: { lifesteal: 0.06 }, desc: '+6% Lifesteal.' },
+
+  // ---- shop stock: sold before each duel, never dropped by monsters
+  iron_sword: { name: 'Iron Sword', slot: 'weapon', type: 'sword', family: null, shop: true, min: 11, max: 16,
+    icon: 'sword', ramp: 'steel', flavor: 'Plain, sharp, dependable.' },
+  twin_fang: { name: 'Twin Fang', slot: 'weapon', type: 'dagger', family: null, shop: true,
+    icon: 'dagger', ramp: 'bone', stats: { crit: 0.05 }, flavor: 'Two edges, no manners.' },
+  oak_staff: { name: 'Oak Staff', slot: 'weapon', type: 'staff', family: null, shop: true, min: 9, max: 13,
+    icon: 'staff', ramp: 'gold', flavor: 'The orb hums when it is happy.' },
+  leather_cap: { name: 'Leather Cap', slot: 'hat', family: null, shop: true, stats: { hp: 14, def: 1, resist: 0.05 },
+    icon: 'hat_helm', look: { shape: 'helm', ramp: 'leather', trim: 'bone' }, flavor: 'Smells of the road.' },
+  chain_mail: { name: 'Chain Mail', slot: 'top', family: null, shop: true, stats: { hp: 26, def: 3 },
+    icon: 'top_plate', look: { shape: 'tunic', ramp: 'steel', trim: 'leather' }, flavor: 'Rings like rain when you run.' },
+  brawler_wraps: { name: 'Brawler Wraps', slot: 'gloves', family: null, shop: true, stats: { atk: 3 },
+    icon: 'gloves', look: { ramp: 'linen', trim: 'leather' }, flavor: 'Knuckles first.' },
+  swift_boots: { name: 'Swift Boots', slot: 'shoes', family: null, shop: true, stats: { haste: 0.1 },
+    icon: 'boots', look: { ramp: 'frost', trim: 'gold' }, flavor: 'Barely touch the ground.' },
+  guard_charm: { name: 'Guard Charm', slot: 'trinket', family: null, shop: true, icon: 't_guard',
+    trigger: { type: 'battleStart' }, effect: { shield: 20, target: 'self' }, desc: 'Battle start: 20 Shield.' },
+  berserker_band: { name: 'Berserker Band', slot: 'trinket', family: null, shop: true, icon: 't_band',
+    trigger: { type: 'hpBelow', pct: 0.5 }, effect: { apply: 'frenzy', duration: 6, target: 'self' }, desc: 'Below 50% HP, once: Frenzy 6s.' },
+  iron_heart: { name: 'Iron Heart', slot: 'trinket', family: null, shop: true, icon: 't_heart',
+    stats: { hp: 25 }, desc: 'A second, sturdier heartbeat.' },
+  mending_pendant: { name: 'Mending Pendant', slot: 'trinket', family: null, shop: true, icon: 't_pendant',
+    trigger: { type: 'everySeconds', s: 4 }, effect: { heal: 6 }, desc: 'Every 4s: heal 6.' },
 };
 for (const [id, it] of Object.entries(ITEMS)) it.id = id;
 
 export const SLOTS = ['hat', 'top', 'weapon', 'gloves', 'shoes', 'trinket1', 'trinket2'];
 export const slotKind = (slot) => (slot.startsWith('trinket') ? 'trinket' : slot);
 export const SLOT_LABEL = { hat: 'Hat', top: 'Top', weapon: 'Weapon', gloves: 'Gloves', shoes: 'Shoes', trinket1: 'Trinket', trinket2: 'Trinket' };
+
+// Scroll "main stat" per slot kind.
+export const MAIN_STAT = {
+  weapon: { stat: 'dmg', per: 1, label: 'Damage' },
+  hat: { stat: 'def', per: 1, label: 'Def' },
+  top: { stat: 'def', per: 1, label: 'Def' },
+  gloves: { stat: 'atk', per: 1, label: 'Atk' },
+  shoes: { stat: 'haste', per: 0.02, label: 'Haste' },
+  trinket: { stat: 'hp', per: 4, label: 'HP' },
+};
 
 // ---------------------------------------------------------------- mobs
 
@@ -165,12 +202,12 @@ export const TIERS = {
   elite: { name: 'Elite', mobs: ['stone_golem', 'cinder_imp'] },
 };
 
-// ---------------------------------------------------------------- rarity
+// ---------------------------------------------------------------- rarity & scrolls
 
 export const RARITIES = {
-  common: { name: 'Common', affixes: 0, next: 'rare' },
-  rare: { name: 'Rare', affixes: 1, next: 'epic' },
-  epic: { name: 'Epic', affixes: 2, next: 'epic' },
+  common: { name: 'Common', affixes: 0, scrap: 1, next: 'rare' },
+  rare: { name: 'Rare', affixes: 1, scrap: 3, next: 'epic' },
+  epic: { name: 'Epic', affixes: 2, scrap: 6, next: 'epic' },
 };
 export const RARITY_ODDS = {
   easy: [['common', 80], ['rare', 18], ['epic', 2]],
@@ -187,11 +224,25 @@ export const AFFIXES = {
   status: { label: 'on hit', value: 0.05 },
 };
 
+export const SCROLLS = {
+  sure: { name: 'Sure Scroll', chance: 1.0, bonus: 1, cost: 2 },
+  chancy: { name: 'Chancy Scroll', chance: 0.6, bonus: 3, cost: 3 },
+  longshot: { name: 'Long-shot Scroll', chance: 0.1, bonus: 8, cost: 4, glow: true },
+};
+export const UPGRADE_SLOTS = 3;
+
+// The shop opens before every duel round. Four wares from its own stock,
+// with rarity odds that improve as the run goes on.
+export const SHOP_SIZE = 4;
+export const SHOP_PRICE = { common: 4, rare: 7, epic: 11 };
+export const shopTier = (round) => (round <= 3 ? 'easy' : round <= 6 ? 'normal' : 'elite');
+
 // ---------------------------------------------------------------- ghosts
 // Hand-written opponents, three per duel round. Each is a saved build as the
 // server would store it: the look plus rolled item instances.
 
-const g = (item, rarity = 'common', affixes = []) => ({ item, rarity, affixes });
+const g = (item, rarity = 'common', affixes = [], bonus = 0, used = 0) =>
+  ({ item, rarity, affixes, upgrades: { used, bonus } });
 
 export const GHOSTS = [
   // round 3: starter kit plus two drops
@@ -219,7 +270,7 @@ export const GHOSTS = [
     equip: { weapon: g('rime_pike', 'rare', [{ stat: 'status', value: 0.05 }]), hat: g('wisp_hood'),
       shoes: g('spore_boots'), top: g('linen_shirt'), trinket1: g('frost_bell') } },
 
-  // round 9: full kit
+  // round 9: full kit, some upgrades
   { id: 'old_granite', name: 'Old Granite', record: '6-2', round: 9, archetype: 'Mace tank',
     look: { gender: 'boy', hair: 'crop', hairColor: 'ash', skin: 'deep', eyes: 'brown' },
     equip: { weapon: g('boulder_maul', 'rare', [{ stat: 'hp', value: 15 }]), top: g('golem_plate'),
@@ -227,12 +278,12 @@ export const GHOSTS = [
       trinket1: g('last_stand_locket'), trinket2: g('metronome') } },
   { id: 'nightshade', name: 'Nightshade', record: '7-1', round: 9, archetype: 'Poison dagger',
     look: { gender: 'girl', hair: 'long', hairColor: 'lavender', skin: 'tan', eyes: 'violet' },
-    equip: { weapon: g('spore_shiv', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'haste', value: 0.06 }]),
+    equip: { weapon: g('spore_shiv', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'haste', value: 0.06 }], 1, 1),
       hat: g('spore_hood'), shoes: g('cinder_boots'), top: g('hide_vest'),
       trinket1: g('viper_fang'), trinket2: g('whetstone') } },
   { id: 'solenne', name: 'Solenne', record: '6-2', round: 9, archetype: 'Crit sword',
     look: { gender: 'girl', hair: 'ponytail', hairColor: 'blond', skin: 'light', eyes: 'blue' },
-    equip: { weapon: g('jelly_sabre', 'rare', [{ stat: 'crit', value: 0.05 }]),
+    equip: { weapon: g('jelly_sabre', 'rare', [{ stat: 'crit', value: 0.05 }], 3, 1),
       gloves: g('tusk_gloves'), top: g('imp_robe'), hat: g('slime_cap'),
       trinket1: g('lucky_clover'), trinket2: g('vampire_tooth') } },
 ];

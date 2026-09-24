@@ -2,7 +2,7 @@
 
 import {
   ITEMS, WEAPON_TYPES, FAMILIES, BASE, RESIST_CAP, MOBS, AFFIXES, RARITIES, RARITY_ODDS,
-  slotKind, scaleFor,
+  MAIN_STAT, SCROLLS, UPGRADE_SLOTS, slotKind, scaleFor,
 } from './data.js';
 
 let uidCounter = 1;
@@ -19,14 +19,14 @@ export function rollInstance(itemId, rarity, round, rng) {
   const affixes = rng.shuffle(pool).slice(0, n).map((stat) => ({
     stat, value: stat === 'status' ? AFFIXES.status.value : AFFIXES[stat].value,
   }));
-  return { uid: newUid(), item: itemId, rarity, round, scale, affixes };
+  return { uid: newUid(), item: itemId, rarity, round, scale, affixes, upgrades: { used: 0, bonus: 0 }, glow: false };
 }
 
 // Ghost builds are written without uid/scale; fill those in. A real build's
 // items dropped over earlier rounds, so ghost gear rolls two rounds behind.
 export function hydrate(inst, round, lag = 2) {
   const r = inst.round || Math.max(1, round - lag);
-  return { uid: newUid(), round: r, scale: scaleFor(r), affixes: [], ...inst };
+  return { uid: newUid(), round: r, scale: scaleFor(r), glow: false, affixes: [], upgrades: { used: 0, bonus: 0 }, ...inst };
 }
 
 // Final numbers for one instance, rounding the way the UI shows them.
@@ -53,6 +53,12 @@ export function instanceStats(inst) {
     }
   }
 
+  const bonus = inst.upgrades?.bonus || 0;
+  if (bonus) {
+    const ms = MAIN_STAT[kind];
+    if (ms.stat === 'dmg') { out.min += bonus; out.max += bonus; }
+    else out[ms.stat] = roundStat(ms.stat, out[ms.stat] + bonus * ms.per);
+  }
   out.statusOnHit = statusOnHit;
   return out;
 }
@@ -170,6 +176,22 @@ export function rollLoot(pool, tier, round, rng, bump = false) {
     out.push(rollInstance(id, rollRarity(tier, rng, bump), round, rng));
   }
   return out;
+}
+
+export function scrapValue(inst) {
+  return RARITIES[inst.rarity].scrap;
+}
+
+export function applyScroll(inst, scrollId, rng) {
+  const sc = SCROLLS[scrollId];
+  if ((inst.upgrades.used || 0) >= UPGRADE_SLOTS) return null;
+  inst.upgrades.used++;
+  const ok = rng.chance(sc.chance);
+  if (ok) {
+    inst.upgrades.bonus += sc.bonus;
+    if (sc.glow) inst.glow = true;
+  }
+  return ok;
 }
 
 // Human-readable stat lines for an instance, for cards and sheets.

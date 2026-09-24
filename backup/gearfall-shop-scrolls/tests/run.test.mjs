@@ -3,9 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Run } from '../src/game.js';
-import { MOBS, BAG_SIZE, LIVES, ROUNDS } from '../src/data.js';
+import { MOBS, BAG_SIZE, LIVES, ROUNDS, SLOTS, GOLD_WIN } from '../src/data.js';
 
-// A simple player: alternates tiers, equips drops that help, bags or leaves the rest.
+// A simple player: alternates tiers, equips drops that help, bags or scraps the rest,
+// and scrolls whatever it can afford.
 function play(run, step) {
   let guard = 0;
   while (!run.over && guard++ < 50) {
@@ -17,7 +18,10 @@ function play(run, step) {
     if (run.loot) {
       const inst = run.loot[run.round % 3];
       const better = run.headline(run.withItem(inst)).dps >= run.headline().dps;
-      run.takeLoot(inst, better ? 'equip' : run.bagFull() ? 'discard' : 'bag');
+      run.takeLoot(inst, better ? 'equip' : run.bagFull() ? 'scrap' : 'bag');
+    }
+    for (const it of [...run.bag, ...Object.values(run.equip)].filter(Boolean)) {
+      if (run.gold >= 2) run.scroll(it.uid, 'sure');
     }
     step?.(run);
     if (!run.over) run.next();
@@ -28,7 +32,9 @@ function play(run, step) {
 function invariants(run) {
   assert.ok(run.bag.length <= BAG_SIZE, 'bag overflow');
   assert.ok(run.lives >= 0 && run.lives <= LIVES, 'lives out of range');
+  assert.ok(run.gold >= 0, 'negative gold');
   assert.ok(run.round >= 1 && run.round <= ROUNDS, 'round out of range');
+  for (const s of SLOTS) if (run.equip[s]) assert.ok(run.equip[s].upgrades.used <= 3, 'too many scrolls');
   const uids = [...run.bag, ...Object.values(run.equip)].filter(Boolean).map((i) => i.uid);
   assert.equal(new Set(uids).size, uids.length, 'an item is in two places');
 }
@@ -43,6 +49,16 @@ test('full runs finish on many seeds without breaking invariants', () => {
     assert.equal(run.history.length, run.wins + run.losses + run.history.filter((h) => h.result === 'D').length);
   }
   assert.ok(crowns > 0, 'nobody ever won a Crown');
+});
+
+test('winning pays gold by tier', () => {
+  const run = new Run(11);
+  const mob = run.offers.find((m) => MOBS[m].tier === 'easy');
+  const before = run.gold;
+  run.fight(mob);
+  const out = run.resolve();
+  if (out.won) assert.equal(run.gold - before, GOLD_WIN.easy);
+  else assert.equal(run.gold - before, 2);
 });
 
 test('save round-trip mid-run', () => {
@@ -99,17 +115,38 @@ test('your saved build comes back as a duel ghost in later runs', async () => {
   assert.ok(met > 5 && met < 35, `met own ghost ${met}/40 times`);
 });
 
-test('discarding frees bag space; leaving loot takes nothing', () => {
-  const run = new Run(21);
-  run.fight(run.offers[0]);
-  run.resolve();
-  if (run.loot) {
-    const before = run.bag.length;
-    run.takeLoot(run.loot[0], 'discard');
-    assert.equal(run.bag.length, before);
-    assert.equal(run.loot, null);
+test('a shop opens before every duel, stocked only with shop items', async () => {
+  const { ITEMS, DUEL_ROUNDS, SHOP_SIZE } = await import('../src/data.js');
+  for (let seed = 1; seed <= 20; seed++) {
+    const run = new Run(seed);
+    assert.equal(run.shop, null);
+    for (const r of DUEL_ROUNDS) {
+      run.round = r;
+      run.rollRound();
+      assert.equal(run.shop.length, SHOP_SIZE);
+      assert.equal(new Set(run.shop.map((w) => w.inst.item)).size, SHOP_SIZE, 'duplicate wares');
+      for (const w of run.shop) assert.ok(ITEMS[w.inst.item].shop, `${w.inst.item} is not a shop item`);
+    }
+    for (const m of Object.values(MOBS)) for (const d of m.drops) assert.ok(!ITEMS[d].shop, `${d} drops from a mob`);
   }
-  const top = run.equip.top;
-  run.discard(top.uid);
-  assert.equal(run.equip.top, null);
+});
+
+test('buying costs gold, needs enough of it, and handles a full bag', () => {
+  const run = new Run(8);
+  run.round = 3;
+  run.rollRound();
+  run.gold = 0;
+  assert.equal(run.buy(0, 'bag'), false);
+  run.gold = 100;
+  const price = run.shop[0].price;
+  assert.equal(run.buy(0, 'bag'), true);
+  assert.equal(run.gold, 100 - price);
+  assert.equal(run.buy(0, 'bag'), false, 'bought the same ware twice');
+  while (!run.bagFull()) run.bag.push({ ...run.bag[0], uid: 'x' + run.bag.length });
+  assert.equal(run.buy(1, 'bag'), false, 'bought into a full bag');
+  const w = run.shop[1];
+  assert.equal(run.buy(1, 'equip'), true);
+  assert.equal(run.equip[run.slotFor(w.inst)]?.uid ?? Object.values(run.equip).find((x) => x?.uid === w.inst.uid)?.uid, w.inst.uid);
+  const json = JSON.parse(JSON.stringify(run));
+  assert.equal(Run.fromJSON(json).shop[1].sold, true);
 });

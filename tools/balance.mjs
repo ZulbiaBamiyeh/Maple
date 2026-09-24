@@ -29,7 +29,7 @@ function playRun(seed, policy) {
         if (s > bestS) { bestS = s; best = inst; }
       }
       const gain = bestS > score(run.headline());
-      run.takeLoot(best, gain ? 'equip' : run.bagFull() ? 'scrap' : 'bag');
+      run.takeLoot(best, gain ? 'equip' : run.bagFull() ? 'discard' : 'bag');
     }
     if (!run.over) run.next();
   }

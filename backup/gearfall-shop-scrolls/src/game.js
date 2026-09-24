@@ -3,10 +3,10 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind,
+  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, SCROLLS, GOLD_WIN, GOLD_LOSS, SHOP_SIZE, SHOP_PRICE, shopTier, slotKind,
 } from './data.js';
 import {
-  rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot,
+  rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot, rollRarity, scrapValue, applyScroll,
 } from './items.js';
 import { simulate } from './sim.js';
 import { GIRL_HAIR, BOY_HAIR } from './art/hero.js';
@@ -55,6 +55,7 @@ export class Run {
     this.look = look || randomLook(this.rng);
     this.round = 1;
     this.lives = LIVES;
+    this.gold = 3;
     this.wins = 0;
     this.losses = 0;
     this.crown = false;
@@ -101,6 +102,35 @@ export class Run {
     return headline(this.fighter(equip));
   }
 
+  // The shop before a duel: SHOP_SIZE distinct wares from the shop-only stock.
+  rollShop() {
+    const r = new Rng(hash(this.seed, this.round, 'shop'));
+    const pool = Object.values(ITEMS).filter((it) => it.shop).map((it) => it.id);
+    this.shop = r.shuffle(pool).slice(0, SHOP_SIZE).map((id) => {
+      const inst = rollInstance(id, rollRarity(shopTier(this.round), r), this.round, r);
+      return { inst, price: SHOP_PRICE[inst.rarity], sold: false };
+    });
+  }
+
+  // Buy ware i. action: 'equip' (the old piece goes to the bag, or is scrapped
+  // if the bag is full) or 'bag'. Returns false if it can't be bought.
+  buy(i, action, slot) {
+    const w = this.shop?.[i];
+    if (!w || w.sold || this.gold < w.price) return false;
+    if (action === 'bag' && this.bagFull()) return false;
+    this.gold -= w.price;
+    w.sold = true;
+    if (action === 'bag') { this.bag.push(w.inst); return true; }
+    slot = slot || this.slotFor(w.inst);
+    const old = this.equip[slot];
+    this.equip[slot] = w.inst;
+    if (old) {
+      if (this.bagFull()) this.gold += scrapValue(old);
+      else this.bag.push(old);
+    }
+    return true;
+  }
+
   // One mob per tier for hunts; a ghost from this round's pool for duels.
   rollRound() {
     const r = new Rng(hash(this.seed, this.round, 'offers'));
@@ -114,7 +144,9 @@ export class Run {
         equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round) : null])),
       };
       this.offers = null;
+      this.rollShop();
     } else {
+      this.shop = null;
       this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(TIERS[t].mobs));
       this.ghost = null;
     }
@@ -124,7 +156,7 @@ export class Run {
   snapshot() {
     const equip = {};
     for (const [s, inst] of Object.entries(this.equip)) {
-      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes };
+      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes, upgrades: { ...inst.upgrades }, glow: inst.glow };
     }
     return {
       id: `me-${this.seed}-${this.round}`, name: `Ghost ${this.name}`, record: this.record, round: this.round,
@@ -164,11 +196,13 @@ export class Run {
     const { result, mobId, duel } = this.lastFight;
     const won = result.winner === 0;
     const draw = result.winner === -1;
-    const out = { won, draw, lifeLost: false };
+    const out = { won, draw, lifeLost: false, gold: 0 };
     const label = duel ? this.ghost.name : MOBS[mobId].name;
     this.tally(result);
     if (won) {
       this.wins++;
+      out.gold = GOLD_WIN[duel ? 'duel' : MOBS[mobId].tier];
+      this.gold += out.gold;
       const lr = new Rng(hash(this.seed, this.round, 'loot'));
       if (duel) {
         const pool = [...new Set(Object.values(this.ghost.equip).filter(Boolean).map((i) => i.item))];
@@ -182,7 +216,9 @@ export class Run {
     } else if (!draw) {
       this.losses++;
       this.lives--;
+      this.gold += GOLD_LOSS;
       out.lifeLost = true;
+      out.gold = GOLD_LOSS;
       this.loot = null;
     } else {
       this.loot = null;
@@ -223,11 +259,10 @@ export class Run {
     return { ...this.equip, [slot]: inst };
   }
 
-  // Take a loot pick. action: 'equip' | 'bag' | 'discard'. slot optional for trinkets.
-  // Equipping over a piece moves it to the bag, or discards it if the bag is full.
+  // Take a loot pick. action: 'equip' | 'bag' | 'scrap'. slot optional for trinkets.
   takeLoot(inst, action, slot) {
-    if (action === 'discard') {
-      // leave it behind
+    if (action === 'scrap') {
+      this.gold += scrapValue(inst);
     } else if (action === 'bag') {
       if (this.bagFull()) return false;
       this.bag.push(inst);
@@ -235,7 +270,10 @@ export class Run {
       slot = slot || this.slotFor(inst);
       const old = this.equip[slot];
       this.equip[slot] = inst;
-      if (old && !this.bagFull()) this.bag.push(old);
+      if (old) {
+        if (this.bagFull()) this.gold += scrapValue(old);
+        else this.bag.push(old);
+      }
     }
     this.loot = null;
     if (this.round === ROUNDS) this.over = true;
@@ -260,14 +298,34 @@ export class Run {
     return true;
   }
 
-  // Throw an item away (from the bag or off the hero) to make room.
-  discard(uid) {
-    this.bag = this.bag.filter((x) => x.uid !== uid);
-    for (const s of SLOTS) if (this.equip[s]?.uid === uid) this.equip[s] = null;
+  scrap(uid) {
+    const i = this.bag.findIndex((x) => x.uid === uid);
+    if (i >= 0) {
+      this.gold += scrapValue(this.bag[i]);
+      this.bag.splice(i, 1);
+      return;
+    }
+    for (const s of SLOTS) {
+      if (this.equip[s]?.uid === uid) {
+        this.gold += scrapValue(this.equip[s]);
+        this.equip[s] = null;
+      }
+    }
   }
 
   find(uid) {
     return this.bag.find((x) => x.uid === uid) || Object.values(this.equip).find((x) => x?.uid === uid);
+  }
+
+  scroll(uid, scrollId) {
+    const inst = this.find(uid);
+    const sc = SCROLLS[scrollId];
+    if (!inst || this.gold < sc.cost) return null;
+    const r = new Rng(hash(this.seed, uid, inst.upgrades.used, scrollId));
+    const ok = applyScroll(inst, scrollId, r);
+    if (ok === null) return null;
+    this.gold -= sc.cost;
+    return ok;
   }
 
   next() {
