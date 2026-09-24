@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mob sheet</title>
+<style>body{background:#221a2f;color:#b3a8d1;font:12px monospace;margin:10px} h3{margin:10px 0 4px;color:#f4f1ff} .row{display:flex;flex-wrap:wrap;gap:6px} canvas{image-rendering:pixelated;background:#342853}</style>
+</head><body>
+<!-- Every monster by day. Serve the repo root and open /tools/mob-sheet.html?s=5 -->
+<script type="module">
+import { mobGrid } from '../src/art/mobs.js';
+import { gridToCanvas } from '../src/art/pixel.js';
+import { DAYS, MOBS } from '../src/data.js';
+const S = +(new URLSearchParams(location.search).get('s') || 5);
+DAYS.forEach((d, i) => {
+  const h = document.createElement('h3'); h.textContent = `Day ${i + 1} · ${d.name}`;
+  const r = document.createElement('div'); r.className = 'row';
+  document.body.append(h, r);
+  for (const ids of Object.values(d.tiers)) for (const id of ids) r.append(gridToCanvas(mobGrid(MOBS[id].sprite), S));
+});
+</script></body></html>

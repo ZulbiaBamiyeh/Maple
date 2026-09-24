@@ -11,11 +11,13 @@ import { glyphGrid, GLYPHS } from '../src/art/glyphs.js';
 import { gridToCanvas } from '../src/art/pixel.js';
 import { HAIR, SKIN, EYES } from '../src/art/palette.js';
 import { ITEMS } from '../src/data.js';
+import { drawScene, SCENES } from '../src/art/scenes.js';
 const S = +(new URLSearchParams(location.search).get('s') || 4);
 const row = (t) => { const h = document.createElement('h3'); h.textContent = t; const d = document.createElement('div'); d.className = 'row'; document.body.append(h, d); return d; };
 const add = (r, g, s = S) => r.append(gridToCanvas(g, s));
 const hc = Object.keys(HAIR), sk = Object.keys(SKIN), ey = Object.keys(EYES);
 let r = row('Hair styles');
+if (new URLSearchParams(location.search).get('only') === 'mobs') { document.body.innerHTML = ''; }
 [...GIRL_HAIR, ...BOY_HAIR].forEach((hair, i) => add(r, heroGrid({ gender: GIRL_HAIR.includes(hair) ? 'girl' : 'boy', hair, hairColor: hc[i % hc.length], skin: sk[i % sk.length], eyes: ey[i % ey.length] }, { weapon: 'wooden_sword', top: 'linen_shirt' })));
 const look = { gender: 'girl', hair: 'long', hairColor: 'pink', skin: 'light', eyes: 'violet' };
 const kits = [
@@ -23,13 +25,21 @@ const kits = [
   { weapon: 'rime_pike', hat: 'wisp_hood' }, { weapon: 'frost_staff', hat: 'wisp_hood', top: 'linen_shirt' },
   { weapon: 'boulder_maul', top: 'golem_plate', hat: 'golem_helm' }, { weapon: 'cinder_rod', top: 'imp_robe', shoes: 'cinder_boots' },
   { weapon: 'jelly_sabre', hat: 'slime_cap', gloves: 'gel_gloves' },
+  { weapon: 'coral_trident', hat: 'shell_helm', top: 'reef_mail' }, { weapon: 'gearbreaker', hat: 'tinker_goggles', top: 'rust_plate' },
+  { weapon: 'blightwood_staff', hat: 'witch_hat', top: 'shadow_cloak' }, { weapon: 'bonecarver', hat: 'skull_helm', top: 'ribcage_plate' },
+  { weapon: 'emberbrand', hat: 'drake_helm', top: 'scale_mail' }, { weapon: 'prism_lance', hat: 'crystal_crown', top: 'geode_plate' },
 ];
 r = row('Equipment on the body (idle / swing)');
 kits.forEach((k) => { add(r, heroGrid(look, k, 'idle')); if (k.weapon) add(r, heroGrid(look, k, 'swing')); });
 r = row('Mobs');
 ['slime', 'shroom', 'boar', 'wisp', 'golem', 'imp'].forEach((m) => add(r, mobGrid(m), S + 1));
+[['Day 2', ['crab', 'jelly', 'eel', 'oyster', 'crabking', 'siren']], ['Day 3', ['cogling', 'mite', 'sprite', 'automaton', 'titan', 'tesla']],
+ ['Day 4', ['bat', 'skeleton', 'crow', 'shade', 'boneknight', 'witch']], ['Day 5', ['emberling', 'harpy', 'tortoise', 'roc', 'drake', 'colossus']]]
+  .forEach(([t, list]) => { const rr = row('Mobs · ' + t); list.forEach((m) => add(rr, mobGrid(m), S + 1)); });
 r = row('Items');
 Object.keys(ITEMS).forEach((id) => add(r, iconGrid(id), 3));
+r = row('Scenes');
+SCENES.forEach((b) => { const c = document.createElement('canvas'); c.width = 120; c.height = 70; c.style.width = '240px'; c.style.height = '140px'; drawScene(c.getContext('2d'), 120, 70, b, 56); r.append(c); });
 r = row('Glyphs');
 Object.keys(GLYPHS).forEach((g) => add(r, glyphGrid(g), 3));
 </script></body></html>

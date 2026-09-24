@@ -3,7 +3,7 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind,
+  ITEMS, MOBS, DAYS, dayOf, dayInfo, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, slotKind,
 } from './data.js';
 import {
   rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot,
@@ -89,6 +89,7 @@ export class Run {
 
   get name() { return this.look.name; }
   get isDuel() { return isDuel(this.round); }
+  get day() { return dayOf(this.round); }
   get record() { return `${this.wins}-${this.losses}`; }
 
   build() {
@@ -115,7 +116,8 @@ export class Run {
       };
       this.offers = null;
     } else {
-      this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(TIERS[t].mobs));
+      const tiers = dayInfo(this.round).tiers;
+      this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(tiers[t]));
       this.ghost = null;
     }
   }
@@ -124,7 +126,7 @@ export class Run {
   snapshot() {
     const equip = {};
     for (const [s, inst] of Object.entries(this.equip)) {
-      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes };
+      if (inst) equip[s] = { item: inst.item, rarity: inst.rarity, round: inst.round, affixes: inst.affixes, perks: inst.perks || [] };
     }
     return {
       id: `me-${this.seed}-${this.round}`, name: `Ghost ${this.name}`, record: this.record, round: this.round,
@@ -172,17 +174,20 @@ export class Run {
       const lr = new Rng(hash(this.seed, this.round, 'loot'));
       if (duel) {
         const pool = [...new Set(Object.values(this.ghost.equip).filter(Boolean).map((i) => i.item))];
-        this.loot = rollLoot(pool, 'normal', this.round, lr, true);
+        this.loot = rollLoot(pool, 'normal', this.round, lr, true, this.day);
       } else {
         const m = MOBS[mobId];
-        this.loot = rollLoot(m.drops, m.tier, this.round, lr);
+        this.loot = rollLoot(m.drops, m.tier, this.round, lr, false, this.day);
       }
       // The last duel pays out a Crown, not a drop.
       if (this.round === ROUNDS) { this.crown = true; this.loot = null; }
     } else if (!draw) {
+      // Hunts are for loot: losing one just means no drop. Only duels cost a life.
       this.losses++;
-      this.lives--;
-      out.lifeLost = true;
+      if (duel) {
+        this.lives--;
+        out.lifeLost = true;
+      }
       this.loot = null;
     } else {
       this.loot = null;

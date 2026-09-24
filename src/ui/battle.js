@@ -20,13 +20,21 @@ const LEAD = 0.16; // real seconds from wind-up start to the strike
 const INTRO = 0.75; // real seconds before the first tick plays
 
 // How each mob attacks.
-const MOB_STYLE = { slime: 'hop', shroom: 'hop', boar: 'charge', wisp: 'cast', golem: 'slam', imp: 'lunge' };
+const MOB_STYLE = {
+  slime: 'hop', shroom: 'hop', boar: 'charge', wisp: 'cast', golem: 'slam', imp: 'lunge',
+  crab: 'lunge', jelly: 'hop', eel: 'lunge', oyster: 'slam', crabking: 'slam', siren: 'cast',
+  cogling: 'charge', mite: 'lunge', sprite: 'cast', automaton: 'lunge', titan: 'slam', tesla: 'cast',
+  bat: 'lunge', skeleton: 'lunge', crow: 'lunge', shade: 'lunge', boneknight: 'slam', witch: 'cast',
+  emberling: 'cast', harpy: 'lunge', tortoise: 'slam', roc: 'charge', drake: 'charge', colossus: 'slam',
+};
+// Bolt colours for casters (and the tint of their swing trails).
+const MOB_COLOR = { wisp: '#9fe0ff', imp: '#f58a3a', siren: '#74e0d0', sprite: '#fff27a', tesla: '#fff27a', witch: '#c07cff', emberling: '#ffc84a' };
 // How close each style gets to its target before striking, in pixels of gap
 // left between them. Ranged styles barely step forward.
 const CLOSE = { dagger: 4, sword: 9, spear: 18, mace: 8, axe: 9, fist: 3, hop: 2, charge: 0, slam: 6, lunge: 4 };
 const RANGED = new Set(['staff', 'cast']);
 
-const SOURCE_COLOR = { Hits: '#f4f1ff', Crits: '#f58a3a', burn: '#f58a3a', poison: '#6cc24a', bleed: '#d9434f', thorns: '#aeb4c8' };
+const SOURCE_COLOR = { Hits: '#f4f1ff', Crits: '#f58a3a', burn: '#f58a3a', poison: '#6cc24a', bleed: '#d9434f', thorns: '#aeb4c8', shock: '#ffe066' };
 
 const glyphCanvas = new Map();
 function glyphC(status) {
@@ -99,7 +107,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     return {
       idle: gridToCanvas(idle), swing: gridToCanvas(swing), grid: idle,
       white: gridToCanvas(silhouette(idle)), blue: gridToCanvas(silhouette(idle, '#7fd8e8')),
-      red: gridToCanvas(silhouette(idle, '#ff5a5a')),
+      red: gridToCanvas(silhouette(idle, '#ff5a5a')), gold: gridToCanvas(silhouette(idle, '#ffd36b')),
       w: 48, h: 44, cx: 24, bottom: 41, headTop: 9, chest: 20, ...weaponInfo(equip),
     };
   }
@@ -107,10 +115,10 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const g = mobGrid(m.sprite);
     const c = gridToCanvas(g);
     const style = MOB_STYLE[m.sprite] || 'lunge';
-    const color = { wisp: '#9fe0ff', imp: '#f58a3a' }[m.sprite] || '#f4f1ff';
+    const color = MOB_COLOR[m.sprite] || '#f4f1ff';
     return {
       idle: c, swing: c, grid: g, white: gridToCanvas(silhouette(g)), blue: gridToCanvas(silhouette(g, '#7fd8e8')),
-      red: gridToCanvas(silhouette(g, '#ff5a5a')),
+      red: gridToCanvas(silhouette(g, '#ff5a5a')), gold: gridToCanvas(silhouette(g, '#ffd36b')),
       w: 32, h: 32, cx: 16, bottom: 30, headTop: 3, chest: 13, style, color, light: '#ffffff', mob: true,
     };
   }
@@ -121,7 +129,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       : { ...mobSprites(MOBS[mobId]), face: -1, flip: false, x: Math.round(W * 0.7) },
   ];
   F.forEach((f, i) => Object.assign(f, {
-    i, act: null, flashAt: -9, flashColor: 'white', kickAt: -9, deadAt: null, winAt: null, statuses: [],
+    i, act: null, flashAt: -9, flashColor: 'white', kickAt: -9, dodgeAt: -9, deadAt: null, winAt: null, statuses: [],
   }));
   F[0].interval = me.weapon.interval / Math.max(0.25, 1 + me.haste);
   F[1].interval = foe.weapon.interval / Math.max(0.25, 1 + foe.haste);
@@ -232,6 +240,13 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     // knockback when hit
     const kp = rt - f.kickAt;
     if (kp >= 0 && kp < 0.14) dx -= f.face * (kp < 0.07 ? 3 : 1);
+    // dodge: a quick hop back out of the way
+    const dp = rt - f.dodgeAt;
+    if (dp >= 0 && dp < 0.3) {
+      const q = Math.sin((dp / 0.3) * Math.PI);
+      dx -= f.face * Math.round(q * 7);
+      dy -= Math.round(q * 3);
+    }
     return { dx, dy, pose };
   }
 
@@ -239,6 +254,12 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   function impact(e) {
     const a = F[e.src];
     const d = F[e.dst];
+    if (e.immune) {
+      floatNum(e.dst, 'IMMUNE', 'small', '#ffd36b');
+      sparks(frontX(d), chestY(d), 6, ['#fff6c8', '#ffd36b'], 0.8);
+      effects.push({ type: 'ring', start: rt, x: d.x, y: groundY - 16, color: '#ffd36b' });
+      return;
+    }
     d.flashAt = rt; d.flashColor = 'white';
     d.kickAt = rt;
     const hx = frontX(d);
@@ -264,7 +285,8 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       const color = STATUSES[e.status]?.color || '#aeb4c8';
       if (visual) {
         const d = F[e.dst];
-        floatNum(e.dst, `${e.dmg}${e.crit ? '!' : ''}`, 'small', color);
+        if (e.immune) { floatNum(e.dst, 'IMMUNE', 'small', '#ffd36b'); return; }
+        floatNum(e.dst, `${e.dmg}${e.crit ? '!' : ''}`, 'small', e.burst ? '#ffffff' : color);
         d.flashAt = rt; d.flashColor = e.status === 'poison' ? 'green' : 'red';
         sparks(d.x, chestY(d), 5, [color, '#ffffff'], 0.6, -20);
       }
@@ -284,6 +306,36 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       }
       const who = e.src === e.dst ? names[e.dst] : names[e.dst];
       log(`${who}: <span style="color:${meta.color}">${meta.name}${e.stacks > 1 ? ' ×' + e.stacks : ''}</span>`);
+    } else if (e.type === 'dodge') {
+      if (visual) {
+        const d = F[e.dst];
+        d.dodgeAt = rt;
+        floatNum(e.dst, 'MISS', 'small', '#b69ae6');
+        for (let k = 0; k < 5; k++) particles.push({ x: d.x + rand(-6, 6), y: chestY(d) + rand(-6, 6), vx: -d.face * rand(20, 40), vy: 0, g: 0, color: '#e6d6ff', life: 0.25, age: 0, size: 1 });
+      }
+      log(`${names[e.dst]} <span style="color:#b69ae6">dodges</span>`);
+    } else if (e.type === 'stasis') {
+      if (visual) {
+        const d = F[e.dst];
+        floatNum(e.dst, 'GILDED', 'crit', '#ffd36b');
+        sparks(d.x, chestY(d), 14, ['#fff6c8', '#ffd36b', '#e0a52e'], 1.2);
+        effects.push({ type: 'ring', start: rt, x: d.x, y: groundY - 16, color: '#ffd36b' });
+      }
+      log(`${names[e.dst]} turns to <span style="color:#ffd36b">gold</span> for ${e.dur}s`);
+    } else if (e.type === 'revive') {
+      if (visual) {
+        const d = F[e.dst];
+        d.flashAt = rt; d.flashColor = 'white';
+        floatNum(e.dst, 'REVIVE!', 'crit', '#ffc84a');
+        sparks(d.x, chestY(d), 22, ['#fff4a8', '#ffc84a', '#f5803a', '#c8402e'], 1.5, -40);
+        if (!reduced) shake = Math.max(shake, 3);
+      }
+      log(`${names[e.dst]} <b style="color:#ffc84a">rises again</b> at ${e.hp} HP`);
+    } else if (e.type === 'reflect') {
+      if (visual) floatNum(e.src, 'REFLECT', 'small', '#c07cff');
+      log(`${names[e.src]} reflects ${STATUSES[e.status]?.name || e.status}`);
+    } else if (e.type === 'cleanse') {
+      if (visual) floatNum(e.dst, 'CLEANSE', 'small', '#d4f6ff');
     } else if (e.type === 'shield') {
       if (visual) {
         floatNum(e.dst, `+${e.amt}`, 'small', '#7fd8e8');
@@ -379,7 +431,10 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
 
     draw(m.pose === 'swing' ? f.swing : f.idle);
     const st = new Set((f.statuses || []).map((s) => s.id));
-    if (st.has('freeze')) draw(f.blue, 0.6);
+    if (st.has('stasis')) {
+      draw(f.gold, 0.7);
+      if (!reduced && Math.random() < 0.3) particles.push({ x: f.x + rand(-9, 9), y: groundY - rand(4, f.bottom - f.headTop), vx: 0, vy: -10, g: 0, color: Math.random() < 0.5 ? '#fff6c8' : '#ffd36b', life: 0.5, age: 0, size: 1, plus: Math.random() < 0.3 });
+    } else if (st.has('freeze')) draw(f.blue, 0.6);
     else if (st.has('chill')) draw(f.blue, 0.28);
     const fl = rt - f.flashAt;
     if (fl >= 0 && fl < 0.08) draw(f.flashColor === 'white' ? f.white : f.flashColor === 'green' ? f.blue : f.red, f.flashColor === 'white' ? 0.75 : 0.5);
@@ -533,7 +588,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const horizon = Math.floor((t + LEAD * speed) * TPS);
     while (animIdx < result.events.length && result.events[animIdx].t <= horizon) {
       const e = result.events[animIdx++];
-      if (e.type !== 'hit') continue;
+      if (e.type !== 'hit' && e.type !== 'dodge') continue;
       const impactRt = rt + (e.t / TPS - t) / speed;
       startAttack(F[e.src], impactRt);
     }
@@ -637,7 +692,7 @@ function whyHtml(result, names) {
   const heals = [0, 0];
   for (const e of result.events) {
     if (e.type === 'hit') add(e.src, e.crit ? 'Crits' : 'Hits', e.dmg);
-    else if (e.type === 'dot') add(1 - e.dst, e.status, e.dmg);
+    else if (e.type === 'dot' && e.status !== 'overclock') add(1 - e.dst, e.status, e.dmg);
     else if (e.type === 'heal') heals[e.dst] += e.amt;
   }
   const max = Math.max(1, ...dealt.flatMap((d) => Object.values(d)));

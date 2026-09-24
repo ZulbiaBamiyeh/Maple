@@ -56,18 +56,27 @@ if (await pg.$('[data-loot]')) {
   await shot('06-gear');
 }
 // play on greedily: always hunt the easy mob, equip loot, until a duel
-for (let i = 0; i < 60; i++) {
+const seen = new Set();
+for (let i = 0; i < 400; i++) {
   if (await pg.$('#primary')) {
     const label = await pg.textContent('#primary');
     if (label.includes('Fight')) { await shot('07-duel-preview'); await pg.click('#primary'); await pg.waitForTimeout(2200); await shot('07b-duel-battle', false); }
     else await pg.click('#primary');
   } else if (await pg.$('[data-mob]')) {
+    const day = await pg.$eval('.day-kicker', (e) => e.textContent).catch(() => '');
+    if (!seen.has(day)) {
+      seen.add(day);
+      if (await pg.$('.day-card')) await shot('day-card-' + seen.size, false);
+      await pg.waitForTimeout(1900);
+      await shot('pick-' + seen.size);
+    }
     await pg.click('[data-mob]');
   } else if (await pg.$('[data-speed="skip"]')) {
     await pg.click('[data-speed="skip"]');
     await pg.waitForTimeout(200);
     await pg.click('#cont');
   } else if (await pg.$('[data-loot]')) {
+    if (seen.size >= 3 && !seen.has('loot')) { seen.add('loot'); await shot('loot-late'); }
     await pg.click('[data-loot]');
     await pg.waitForTimeout(150);
     await pg.click('[data-act="equip"]');

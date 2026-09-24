@@ -4,16 +4,18 @@
 // top and the whole thing is outlined by compose().
 
 import { compose } from './pixel.js';
+import { MORE_MOBS } from './mobs2.js';
 
 const W = 32, H = 32;
 
-class Painter {
-  constructor() {
-    this.g = Array.from({ length: H }, () => new Array(W).fill('.'));
+export class Painter {
+  constructor(w = W, h = H) {
+    this.w = w; this.h = h;
+    this.g = Array.from({ length: h }, () => new Array(w).fill('.'));
   }
   px(x, y, c) {
     x = Math.round(x); y = Math.round(y);
-    if (x >= 0 && y >= 0 && x < W && y < H) this.g[y][x] = c;
+    if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.g[y][x] = c;
   }
   // ramp: [highlight, light, mid, dark]
   ellipse(cx, cy, rx, ry, ramp, { clip = null, light = [-0.55, -0.7, 0.45] } = {}) {
@@ -35,13 +37,43 @@ class Painter {
   rect(x, y, w, h, c) {
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.px(x + i, y + j, c);
   }
-  stamp(rows, x, y) {
+  stamp(rows, x, y, map = null) {
     rows.forEach((r, j) => {
-      for (let i = 0; i < r.length; i++) if (r[i] !== '.') this.px(x + i, y + j, r[i]);
+      for (let i = 0; i < r.length; i++) if (r[i] !== '.') this.px(x + i, y + j, map?.[r[i]] ?? r[i]);
     });
   }
-  rows() {
-    return this.g.map((r) => r.join(''));
+  // Filled polygon, flat colour (for facets, wings, crystals).
+  poly(pts, c) {
+    const ys = pts.map((p) => p[1]);
+    for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
+      const xs = [];
+      for (let i = 0; i < pts.length; i++) {
+        const [x1, y1] = pts[i];
+        const [x2, y2] = pts[(i + 1) % pts.length];
+        if ((y + 0.5 >= Math.min(y1, y2)) && (y + 0.5 < Math.max(y1, y2))) xs.push(x1 + ((y + 0.5 - y1) / (y2 - y1)) * (x2 - x1));
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.round(xs[k]); x < Math.round(xs[k + 1]); x++) this.px(x, y, c);
+    }
+  }
+  line(x0, y0, x1, y1, c, w = 1) {
+    const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+    for (let i = 0; i <= n; i++) {
+      const x = x0 + ((x1 - x0) * i) / n;
+      const y = y0 + ((y1 - y0) * i) / n;
+      this.rect(Math.round(x - (w - 1) / 2), Math.round(y - (w - 1) / 2), w, w, c);
+    }
+  }
+  // Rows of single-character keys; any '#rrggbb' cells get a private key in `map`.
+  rows(map = {}) {
+    const keys = new Map();
+    let next = 0x100;
+    const out = this.g.map((r) => r.map((c) => {
+      if (c.length === 1) return c;
+      if (!keys.has(c)) { const k = String.fromCharCode(next++); keys.set(c, k); map[k] = c; }
+      return keys.get(c);
+    }).join(''));
+    return { rows: out, map };
   }
 }
 
@@ -237,11 +269,13 @@ function imp() {
   return p.rows();
 }
 
-const BUILDERS = { slime, shroom, boar, wisp, golem, imp };
+const BUILDERS = { slime, shroom, boar, wisp, golem, imp, ...MORE_MOBS };
 
 export function mobGrid(sprite) {
-  const rows = BUILDERS[sprite]();
-  return compose(W, H, [{ rows, map: MOB_MAP }]);
+  // Builders return a Painter (or, for the first six, its rows).
+  let out = BUILDERS[sprite]();
+  if (out instanceof Painter) out = out.rows();
+  return compose(W, H, [{ rows: out.rows, map: { ...MOB_MAP, ...out.map } }]);
 }
 
 export const MOB_SIZE = W;

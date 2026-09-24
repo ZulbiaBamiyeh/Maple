@@ -8,6 +8,7 @@
 import { compose, Grid } from './pixel.js';
 import { RAMPS } from './palette.js';
 import { ITEMS } from '../data.js';
+import { paintedIcon } from './icons2.js';
 
 const rampKeys = (main, trim) => ({
   1: main[0], 2: main[1], 3: main[2],
@@ -401,6 +402,31 @@ const TOP_ICONS = {
     '....7788889....',
     '....999999.....',
   ],
+  scale: [
+    '.TTUV.....TUUV.',
+    'TTUU7878787UUVV',
+    'TU787878787879V',
+    '..78787878789..',
+    '...878787878...',
+    '...787878789...',
+    '...878787899...',
+    '...UUUUUUUVV...',
+    '...78787878....',
+    '....878789.....',
+  ],
+  cloak: [
+    '.....TTUUV.....',
+    '...7788TU8899..',
+    '..77788U888899.',
+    '.777788.888899.',
+    '.77788..888899.',
+    '.7778....88899.',
+    '777788..8888999',
+    '777888..8888999',
+    '77788....888999',
+    '7788......88999',
+    '.UUU......VVVV.',
+  ],
   robe: [
     '...7788TT889....',
     '..77778UV88899..',
@@ -431,6 +457,8 @@ export function iconGrid(itemId) {
   if (it.slot === 'hat' || it.slot === 'top') {
     rows = it.slot === 'top' ? TOP_ICONS[it.look.shape] : SHAPE_ICONS.hat[it.look.shape];
     map = { 7: main[0], 8: main[1], 9: main[2], T: trim[0], U: trim[1], V: trim[2] };
+  } else if (paintedIcon(it.icon)) {
+    ({ rows, map } = paintedIcon(it.icon));
   } else {
     const ic = ICONS[it.icon];
     rows = ic.rows;

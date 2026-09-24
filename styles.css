@@ -60,8 +60,11 @@ button { font-family: inherit; color: inherit; }
   padding: 8px 0 6px; gap: 8px; flex: none;
 }
 .hud .lives, .pips { display: flex; gap: 3px; align-items: center; }
-.pip { width: 10px; height: 10px; background: var(--panel-2); border: 2px solid var(--edge); }
-.pip.duel { transform: rotate(45deg); width: 9px; height: 9px; }
+.pips { gap: 6px; }
+.day-pips { display: flex; gap: 2px; align-items: center; padding: 2px; border-radius: 3px; }
+.day-pips.cur { background: #f2c14e22; }
+.pip { width: 7px; height: 7px; background: var(--panel-2); border: 2px solid var(--edge); }
+.pip.duel { transform: rotate(45deg); width: 7px; height: 7px; margin: 0 1px; }
 .pip.done-w { background: var(--green); border-color: #3d7f37; }
 .pip.done-l { background: var(--red); border-color: #8f2437; }
 .pip.done-d { background: var(--muted); }
@@ -342,8 +345,8 @@ h2 { font-size: 20px; line-height: 1.1; }
 .end { text-align: center; align-items: center; padding-top: 12px; }
 .end .actions { width: 100%; }
 .end-logo { font-size: clamp(30px, 10vw, 42px); display: flex; align-items: center; gap: 10px; }
-.history { display: flex; flex-wrap: nowrap; gap: 4px; justify-content: center; }
-.history .h { font-family: var(--num); font-size: 11px; min-width: 26px; padding: 3px 4px; border-radius: 4px; border: 2px solid var(--edge); }
+.history { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; max-width: 330px; margin: 0 auto; }
+.history .h { font-family: var(--num); font-size: 10px; min-width: 20px; padding: 2px 3px; border-radius: 4px; border: 2px solid var(--edge); }
 .history .h.W { border-color: var(--green); color: #a6e87e; } .history .h.L { border-color: var(--red); color: #ff9aa5; }
 .shake { animation: shake .25s steps(4); }
 @keyframes shake { 25% { transform: translate(-3px, 1px); } 50% { transform: translate(3px, -1px); } 75% { transform: translate(-2px, 0); } }
@@ -468,3 +471,22 @@ h2 { font-size: 20px; line-height: 1.1; }
 
 /* HUD: lives | round pips | menu, with the pips centred */
 .hud { display: grid; grid-template-columns: 1fr auto 1fr; }
+
+/* ------------------------------------------------------------------ days */
+.day-kicker { font-family: var(--num); font-size: 11px; letter-spacing: 1.5px; color: var(--gold); margin-bottom: 2px; }
+.day-card {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, #2d2447f2 0%, #1a1423f7 70%); text-align: center; animation: dayIn .35s ease-out;
+}
+.day-card .n { font-family: var(--num); font-size: 44px; color: var(--gold); letter-spacing: 3px; text-shadow: 0 3px 0 #1a1423; }
+.day-card .n span { font-size: 20px; color: var(--muted); }
+.day-card .t { font-size: 24px; font-weight: 700; color: #f4f1ff; margin-top: 4px; animation: dayIn .5s ease-out; }
+.day-card .s { font-size: 13px; color: var(--muted); margin-top: 10px; }
+.day-card.out { opacity: 0; transition: opacity .3s; }
+@keyframes dayIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* relics: a gold rim wherever they show up */
+.relic-drop { display: inline-flex; border-radius: 3px; box-shadow: 0 0 0 1px #f2c14e, 0 0 6px #f2c14e88; background: #f2c14e22; }
+.relic-tag { font-family: var(--num); font-size: 9px; letter-spacing: 1px; color: #1a1423; background: linear-gradient(#ffe08a, #f2c14e); padding: 1px 4px; border-radius: 2px; vertical-align: middle; }
+.perk { color: var(--gold); }
+.lootcard .perkline { font-size: 12px; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

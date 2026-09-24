@@ -5,18 +5,19 @@ import assert from 'node:assert/strict';
 import { Run } from '../src/game.js';
 import { MOBS, BAG_SIZE, LIVES, ROUNDS } from '../src/data.js';
 
-// A simple player: alternates tiers, equips drops that help, bags or leaves the rest.
+// A simple player: mostly easy hunts, equips drops that help, bags or leaves the rest.
 function play(run, step) {
   let guard = 0;
   while (!run.over && guard++ < 50) {
-    const tier = ['easy', 'normal', 'elite'][run.round % 3];
+    const tier = run.round % 3 === 1 ? 'normal' : 'easy';
     const mob = run.isDuel ? undefined : run.offers.find((m) => MOBS[m].tier === tier);
     run.fight(mob);
     run.resolve();
     step?.(run);
     if (run.loot) {
-      const inst = run.loot[run.round % 3];
-      const better = run.headline(run.withItem(inst)).dps >= run.headline().dps;
+      const score = (h) => h.dps * h.ehp;
+      const inst = run.loot.reduce((a, b) => (score(run.headline(run.withItem(b))) > score(run.headline(run.withItem(a))) ? b : a));
+      const better = score(run.headline(run.withItem(inst))) >= score(run.headline());
       run.takeLoot(inst, better ? 'equip' : run.bagFull() ? 'discard' : 'bag');
     }
     step?.(run);
@@ -112,4 +113,36 @@ test('discarding frees bag space; leaving loot takes nothing', () => {
   const top = run.equip.top;
   run.discard(top.uid);
   assert.equal(run.equip.top, null);
+});
+
+test('losing a hunt costs no life; losing a duel does', () => {
+  let huntLosses = 0, duelLosses = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const run = new Run(seed);
+    while (!run.over) {
+      const before = run.lives;
+      const elite = run.isDuel ? undefined : run.offers[2];
+      run.fight(elite);
+      const out = run.resolve();
+      if (!out.won && !out.draw) {
+        if (run.lastFight.duel) { duelLosses++; assert.equal(run.lives, before - 1); }
+        else { huntLosses++; assert.equal(run.lives, before); assert.equal(run.loot, null); }
+      }
+      if (run.loot) run.takeLoot(run.loot[0], 'equip');
+      if (!run.over) run.next();
+    }
+  }
+  assert.ok(huntLosses > 0 && duelLosses > 0);
+});
+
+test('perks come from rarity: none on commons, some on rares, always on epics', async () => {
+  const { rollInstance } = await import('../src/items.js');
+  const { Rng } = await import('../src/rng.js');
+  const r = new Rng(3);
+  const roll = (rarity) => Array.from({ length: 200 }, () => rollInstance('spore_shiv', rarity, 5, r).perks.length);
+  assert.ok(roll('common').every((n) => n === 0));
+  const rare = roll('rare');
+  const share = rare.filter((n) => n > 0).length / rare.length;
+  assert.ok(share > 0.3 && share < 0.5, `rare perk share ${share}`);
+  assert.ok(roll('epic').every((n) => n >= 1));
 });

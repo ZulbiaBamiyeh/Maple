@@ -305,6 +305,26 @@ const TOPS = {
     '.5577888888956',
     '.56UUVVVVVV.66',
   ],
+  scale: [
+    '..TTUUUUUUUV..',
+    '.47878787878V.',
+    '.4787878787895',
+    '.4878787878995',
+    '.558787878789.',
+    '.56UUUUUUUVV66',
+    '...87878789...',
+  ],
+  cloak: [
+    '.TTTUUUUUUUVV.',
+    '77778T88U88899',
+    '7477888888899.',
+    '7478888888895.',
+    '7558888888895.',
+    '756888888889.6',
+    '77.88888888999',
+    '78.88888888.99',
+    '8..88888889..9',
+  ],
   robe: [
     '...7788888U...',
     '..77T88888U9..',
@@ -319,6 +339,65 @@ const TOPS = {
 };
 
 const HATS = {
+  shell: [
+    '.......7T7.........',
+    '.....7T778T8.......',
+    '....7T78T88T89.....',
+    '...7T78T88T88T9....',
+    '..7T78T88T88T889...',
+    '..T78T88T88T88T89..',
+    '.7T78T88T88T88T899.',
+    '.UUUUUUUUUUUUUUVVV.',
+    '..VV.V..V..V..V.V..',
+  ],
+  goggles: [
+    '.......777888......',
+    '.....777888888.....',
+    '....7778888888899..',
+    '...77888888888899..',
+    '..778888888888889..',
+    '.UUUUUTTUUUUTTUUVV.',
+    '.VVVVTicTVVTicTVVV.',
+    '.....TccTVVTccT....',
+    '......TT....TT.....',
+  ],
+  witch: [
+    '..............79...',
+    '............7789...',
+    '...........77899...',
+    '..........7788.....',
+    '.........77889.....',
+    '........778889.....',
+    '.......7788889.....',
+    '......77888889.....',
+    '......UUUUUUVV.....',
+    '.....TUUUUUUUV9....',
+    '...7788888888888...',
+    '777888888888888899.',
+    '.99999999999999999.',
+  ],
+  horned: [
+    'T..................',
+    'TU.................',
+    '.TU....7777.....TU.',
+    '.TUU.77778888..TU..',
+    '..TUU7778888888UV..',
+    '..777888888888889..',
+    '.77888888888888899.',
+    '.TTTTUUUUUUUUUUUVV.',
+    '.UUUVVVVVVVVVVVVV..',
+    '.99.............99.',
+    '.99.............99.',
+    '..9..............9.',
+  ],
+  crown: [
+    '...................',
+    '....T...T...T......',
+    '....TU.TUU.TUU.....',
+    '....TUUTUUUTUUV....',
+    '....7r77b77r889....',
+    '....UUUUUUUUVVV....',
+  ],
   slime: [
     '......777777.......',
     '....7777788888.....',
@@ -434,10 +513,10 @@ export function heroLayers(look, equip = {}, pose = 'idle') {
   const hat = equip.hat ? ITEMS[equip.hat].look.shape : null;
   for (const [rows, x, y] of style.front) {
     // a helm or hood hides the crown; the fringe still peeks out
-    if (hat && rows === CROWN) continue;
+    if (hat && rows === CROWN && !HAT_SHOWS_HAIR.has(hat)) continue;
     at(rows, x, y);
   }
-  if (hat) at(HATS[hat], 6, 0, itemMap(equip.hat, base));
+  if (hat) at(HATS[hat], 6, HAT_Y[hat] || 0, itemMap(equip.hat, base));
 
   // weapon, then the front hand over its grip
   const hand = pose === 'swing' ? { x: 23, y: 19 } : { x: 21, y: 20 };
@@ -459,5 +538,9 @@ export function heroLayers(look, equip = {}, pose = 'idle') {
 export function heroGrid(look, equip, pose) {
   return compose(HERO_W, HERO_H, heroLayers(look, equip, pose), { shade: shaderFor(look) });
 }
+
+// Tall hats start above the usual line; small ones sit on top of the hair.
+const HAT_Y = { witch: -5, horned: -2, crown: -3, shell: 0, goggles: 1 };
+const HAT_SHOWS_HAIR = new Set(['crown']);
 
 SHAPE_ICONS.hat = HATS;

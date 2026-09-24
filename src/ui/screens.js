@@ -6,10 +6,10 @@
 // sprites pick a whole-number scale that fits the space they were given.
 
 import {
-  ITEMS, MOBS, FAMILIES, RARITIES, RARITY_ODDS, BAG_SIZE,
-  slotKind, scaleFor, STATUSES,
+  ITEMS, MOBS, FAMILIES, RARITIES, rarityOdds, BAG_SIZE,
+  slotKind, scaleFor, STATUSES, dayInfo, dayOf, DAYS_IN_RUN,
 } from '../data.js';
-import { statLines, setCounts, activeSets, headline } from '../items.js';
+import { statLines, perkLines, setCounts, activeSets, headline } from '../items.js';
 import { drawScene } from '../art/scenes.js';
 import {
   hud, heroImg, iconImg, mobImg, glyph, statusGlyph, tile, itemName, slotName, cap,
@@ -63,10 +63,10 @@ function later(fn) {
 // ---------------------------------------------------------------- first-time popups
 
 const INTRO = {
-  pick: ['Choose your hunt', `
+  hunt: ['Choose your hunt', `
     <p>Pick one of three monsters. The fight plays itself.</p>
-    <p>Each card shows what it <b>drops</b> and your <b>odds</b> with your current gear. Elite hunts drop rarer loot, but a loss costs one of your 3 lives.</p>
-    <p>Every 3rd round is a <b>duel</b> against another player's build. Win round 9 for a Crown.</p>`],
+    <p>Each card shows what it <b>drops</b> and your <b>odds</b> with your current gear. Tougher monsters drop rarer loot. Lose and you just get nothing this round.</p>
+    <p>Each day ends in a <b>duel</b> against another player's build. Losing a duel costs one of your 3 lives. Survive 5 days and win the last duel for a Crown.</p>`],
   loot: ['Pick your drop', `
     <p>Keep one of three drops. Tap it to compare with what you wear.</p>
     <p><b>Equip</b> it, stash it in your <b>bag</b> for later, or leave it behind.</p>`],
@@ -123,9 +123,9 @@ export function pickScreen(app, ctx) {
   const sc = scaleFor(run.round);
   const cards = run.offers.map((id, i) => {
     const m = MOBS[id];
-    const odds = RARITY_ODDS[m.tier];
-    const oh = m.onHit?.[0];
-    const traitGlyph = oh ? statusGlyph(oh.apply, 2) : m.regen ? statusGlyph('regen', 2) : '';
+    const odds = rarityOdds(m.tier, run.day);
+    const ap = m.onHit?.[0]?.apply || m.triggers?.find((tr) => tr.effect.apply)?.effect.apply;
+    const traitGlyph = ap ? statusGlyph(ap, 2) : m.regen ? statusGlyph('regen', 2) : '';
     return `
     <div class="mobcard panel deal" data-mob="${id}" style="animation-delay:${i * 0.08}s">
       <div class="portrait" data-stage="${m.family},0.86,3">${mobImg(m.sprite, 3)}</div>
@@ -134,7 +134,7 @@ export function pickScreen(app, ctx) {
         <div class="oddsline" data-odds="${id}"><span class="odds-chip o0">…</span></div>
         <div class="line">HP ${Math.round(m.hp * sc)} · Hit ${Math.round(m.min * sc)}–${Math.round(m.max * sc)} · ${m.interval}s${m.def ? ` · Def ${m.def}` : ''}</div>
         <div class="traitrow"><span class="chip trait">${traitGlyph} ${m.trait}</span></div>
-        <div class="drops">${m.drops.map((d) => iconImg(d, 1.2)).join('')}</div>
+        <div class="drops">${m.drops.map((d) => (ITEMS[d].relic ? `<span class="relic-drop" title="Relic">${iconImg(d, 1.2)}</span>` : iconImg(d, 1.2))).join('')}</div>
         <div class="odds" aria-label="Common ${odds[0][1]}%, rare ${odds[1][1]}%, epic ${odds[2][1]}%">
           ${odds.map(([r, w]) => `<span class="${r[0]}" style="width:${w}%"></span>`).join('')}
         </div>
@@ -144,6 +144,7 @@ export function pickScreen(app, ctx) {
   app.innerHTML = `
     ${hud(run)}
     <section class="screen">
+      <div class="day-kicker">DAY ${run.day} · ${dayInfo(run.round).name.toUpperCase()}</div>
       <h2>Choose your hunt</h2>
       <div class="mobs">${cards}</div>
       <div class="actions">
@@ -159,7 +160,18 @@ export function pickScreen(app, ctx) {
   later(() => app.querySelectorAll('[data-odds]').forEach((el) => {
     el.innerHTML = oddsChip(run.mobOdds(el.dataset.odds));
   }));
-  intro('pick');
+  // A new day gets a short title card the first time its hunt screen shows.
+  if (run.round % 3 === 1 && run._dayShown !== run.day) {
+    run._dayShown = run.day;
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    card.innerHTML = `<div class="n">DAY ${run.day}<span>/${DAYS_IN_RUN}</span></div><div class="t">${dayInfo(run.round).name}</div>
+      <div class="s">${run.day === 1 ? 'Hunt twice, then duel a rival.' : run.day === DAYS_IN_RUN ? 'The last day. Win the final duel for the Crown.' : 'Tougher monsters, better loot.'}</div>`;
+    app.append(card);
+    const bye = () => { card.classList.add('out'); setTimeout(() => card.remove(), 300); };
+    card.onclick = bye;
+    setTimeout(bye, 1700);
+  } else intro('hunt');
 }
 
 // ---------------------------------------------------------------- gear hub / duel preview
@@ -190,7 +202,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
       <div class="foe panel">
         <div class="foe-stage" data-stage="duel,0.88,2">${heroImg(gh.look, null, 2, { flip: true, shadow: true })}<span class="mystery">?</span></div>
         <div class="foe-info">
-          <div class="kicker">DUEL · ROUND ${run.round}</div>
+          <div class="kicker">DUEL · DAY ${run.day}</div>
           <div class="name">${gh.name} <span class="chip trait">${gh.record}</span></div>
           <div class="sub">${gh.mine ? 'One of your past builds. ' : ''}Build hidden until the fight.</div>
         </div>
@@ -210,7 +222,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
     ? `<button class="btn go" id="primary">Fight ${run.ghost.name} ▸</button>`
     : mode === 'view'
       ? `<button class="btn" id="primary">◂ Back to hunt</button>`
-      : `<button class="btn primary" id="primary">Round ${run.round + 1} ▸</button>`;
+      : `<button class="btn primary" id="primary">${(run.round + 1) % 3 === 0 ? 'Duel' : run.round % 3 === 0 ? `Day ${dayOf(run.round) + 1}` : 'Next hunt'} ▸</button>`;
 
   app.innerHTML = `
     ${hud(run)}
@@ -218,7 +230,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
       ${foeHtml}
       <div class="paperdoll panel">
         <div class="col">${slotTile('hat', 'Hat')}${slotTile('top', 'Top')}${slotTile('gloves', 'Gloves')}${slotTile('shoes', 'Shoes')}</div>
-        <div class="doll-stage ${pop ? 'pop' : ''}" data-stage="${mode === 'duel' ? 'duel' : 'slime'},0.88,5">${heroImg(run.look, run.equip, 4)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
+        <div class="doll-stage ${pop ? 'pop' : ''}" data-stage="${mode === 'duel' ? 'duel' : dayInfo(Math.min(run.round, 15)).biome},0.88,5">${heroImg(run.look, run.equip, 4)}${pop ? '<i class="spk s1"></i><i class="spk s2"></i><i class="spk s3"></i><i class="spk s4"></i>' : ''}</div>
         <div class="col">${slotTile('weapon', 'Weapon')}${slotTile('trinket1', 'Trinket')}${slotTile('trinket2', 'Trinket')}</div>
       </div>
       <div class="statpanel panel">
@@ -277,8 +289,9 @@ export function lootScreen(app, ctx) {
       ${tile(inst, { size: 2.5 })}
       <div class="lc-body">
         <div class="nm rc-${inst.rarity}">${it.name}</div>
-        <div class="meta">${RARITIES[inst.rarity].name} ${slotName(inst)}${it.family ? ` · ${FAMILIES[it.family].name}` : ''}</div>
-        <div class="lines">${statLines(inst).join(' · ')}</div>
+        <div class="meta">${it.relic ? '<span class="relic-tag">RELIC</span> ' : ''}${RARITIES[inst.rarity].name} ${slotName(inst)}${it.family ? ` · ${FAMILIES[it.family].name}` : ''}</div>
+        ${perkLines(inst).length ? `<div class="perkline">${perkLines(inst).join(' ')}</div>` : ''}
+        <div class="lines">${statLines(inst).slice(perkLines(inst).length).join(' · ')}</div>
         <div class="cmp">DPS ${delta(before.dps, after.dps)} EHP ${delta(before.ehp, after.ehp)}</div>
         ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
       </div>
@@ -385,10 +398,10 @@ export function itemSheet(ctx, inst, where) {
       ${tile(inst, { size: 3 })}
       <div>
         <div class="nm rc-${inst.rarity}">${it.name}</div>
-        <div class="meta">${RARITIES[inst.rarity].name} ${slotName(inst)}${fam ? ` · ${fam.name}` : ''}</div>
+        <div class="meta">${it.relic ? '<span class="relic-tag">RELIC</span> ' : ''}${RARITIES[inst.rarity].name} ${slotName(inst)}${fam ? ` · ${fam.name}` : ''}</div>
       </div>
     </div>
-    <div class="statlist">${statLines(inst).map((l) => `<span>${l}</span>`).join('')}</div>
+    <div class="statlist">${statLines(inst).map((l) => `<span class="${l.startsWith('✦') ? 'perk' : ''}">${l}</span>`).join('')}</div>
     ${setLine}
     ${cmp}
     ${acts.length ? `<div class="actions">${acts.join('')}</div>` : `<div class="actions">${where.back ? '<button class="btn" data-act="back">◂ Their build</button>' : ''}<button class="btn" data-act="close">Close</button></div>`}`;
@@ -487,10 +500,11 @@ export function helpSheet() {
   const html = `
     <h2>How to play</h2>
     <div class="help">
-      <p><b>The run.</b> 9 rounds, 3 lives. Rounds 3, 6 and 9 are duels against another player's saved build. Win round 9 for a Crown.</p>
-      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear. A loss costs a life.</p>
-      <p><b>Duels.</b> Rounds 3, 6 and 9 pit you against another player's saved build, hidden until the fight starts. Build for all-round strength; win to loot from their gear.</p>
+      <p><b>The run.</b> 5 days, 3 lives. Each day is two hunts, then a duel against another player's saved build. Each day's monsters are tougher than the last. Win the final duel for a Crown.</p>
+      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear. Losing a hunt just means no drop.</p>
+      <p><b>Duels.</b> Hidden until the fight starts. Build for all-round strength. Win to loot from their gear; lose and you lose a life.</p>
       <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
+      <p><b>Perks and relics.</b> Rare and epic drops can roll ✦ perks: niche effects to build around. Every elite also guards a <b>relic</b>, a rule-bending trinket (never common).</p>
       <p><b>Bag.</b> Six slots for spare pieces. Discard what you don't need.</p>
       <h3>Stats</h3>
       ${stat('DPS', 'Average damage per second.')}
@@ -501,6 +515,10 @@ export function helpSheet() {
       ${stat('Haste', 'Faster attacks.')}
       ${stat('Resist', 'Shortens harmful statuses on you, up to 50%.')}
       ${stat('Lifesteal', 'Heals you for a share of damage dealt.')}
+      ${stat('Evasion', 'Chance to dodge a weapon hit entirely (max 40%).')}
+      ${stat('Crit dmg', 'Extra damage on crits, on top of 150%.')}
+      ${stat('Thorns', 'Damage dealt back to anyone who hits you.')}
+      ${stat('Pierce', 'Ignores that much of the target\'s Def.')}
       <h3>Statuses</h3>
       ${statuses}
     </div>

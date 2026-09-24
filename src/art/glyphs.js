@@ -19,12 +19,16 @@ export const GLYPHS = {
   coin: ['.yyyy.', 'yhyyyY', 'yhYyyY', 'yhYyyY', 'yyyyYY', '.YYYY.'],
   crown: ['y..y..y', 'yy.y.yy', 'yyyyyyy', 'yrryrry', 'yyyyyyy', 'YYYYYYY'],
   swords: ['s.....s', '.s...s.', '..s.s..', '...s...', '..y.y..', '.b...b.', 'b.....b'],
+  spark: ['.h...y.', '..h.y..', 'hhhyyyy', '..yhy..', '.y.y.h.', 'y..y..h', '...y...'],
+  eye: ['.......', '.ppppp.', 'pwwPwwp', 'pwPPPwp', 'pwwPwwp', '.ppppp.', '.......'],
+  hourglass: ['yyyyyyy', '.hyyyY.', '..hyY..', '...y...', '..hyY..', '.hyyyY.', 'yyyyyyy'],
   paw: ['.m.m.m.', '.m.m.m.', '.......', '..mmm..', '.mmmmm.', '.mmmmm.', '..m.m..'],
 };
 
 export const STATUS_GLYPH = {
   burn: 'fire', poison: 'drop', bleed: 'blood', stun: 'star', chill: 'flake', freeze: 'ice',
   weaken: 'down', sunder: 'crack', shield: 'shield', regen: 'plus', frenzy: 'bolt', thorns: 'crack',
+  shock: 'spark', hex: 'eye', stasis: 'hourglass', overclock: 'bolt',
 };
 
 export function glyphGrid(name) {

@@ -18,11 +18,11 @@ function playRun(seed, policy) {
     }
     run.fight(mob);
     const out = run.resolve();
-    const key = run.isDuel ? `duel${run.round}` : `${MOBS[mob].tier}`;
+    const key = run.isDuel ? `D${run.day}duel` : `D${run.day}${{ easy: 'E', normal: 'N', elite: 'X' }[MOBS[mob].tier]}`;
     tierWins[key] = tierWins[key] || [0, 0];
     tierWins[key][0] += out.won ? 1 : 0;
     tierWins[key][1]++;
-    if (run.loot) {
+    while (run.loot) {
       let best = null, bestS = -1;
       for (const inst of run.loot) {
         const s = score(run.headline(run.withItem(inst)));
@@ -64,6 +64,6 @@ for (const [name, pol] of Object.entries(policies)) {
     crowns += r.crown; rounds += r.round;
     for (const [k, [w, n]] of Object.entries(r.tierWins)) { agg[k] = agg[k] || [0, 0]; agg[k][0] += w; agg[k][1] += n; }
   }
-  const tw = Object.entries(agg).map(([k, [w, n]]) => `${k} ${Math.round((100 * w) / n)}%`).join('  ');
-  console.log(`${name.padEnd(7)} crown ${Math.round((100 * crowns) / N)}%  avg round ${(rounds / N).toFixed(1)}  | ${tw}`);
+  const tw = Object.entries(agg).sort().map(([k, [w, n]]) => `${k} ${Math.round((100 * w) / n)}%`).join(' ');
+  console.log(`${name.padEnd(7)} crown ${Math.round((100 * crowns) / N)}%  avg round ${(rounds / N).toFixed(1)}\n   ${tw}`);
 }
