@@ -11,7 +11,7 @@ export class LedgerPanel {
   private body = el('div', 'ledger');
 
   constructor(private run: Run, private onDone: () => void) {
-    this.win = makeWindow('Day', { x: 260, y: 120, width: 520 });
+    this.win = makeWindow('Day', { x: 260, y: 120, width: 520, cls: 'w-ledger' });
     const panel = el('div', 'panel');
     panel.append(this.body);
     const btn = el('button', 'btn blue', 'sleep');

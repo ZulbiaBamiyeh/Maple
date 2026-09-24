@@ -51,7 +51,7 @@ export class Scene {
   private climbY = 0;
 
   onInteract?: (t: Target) => void;
-  onPrompt?: (t: Target | null) => void;
+  onPrompt?: (t: Target | null, atLadder: boolean) => void;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -80,8 +80,8 @@ export class Scene {
 
   private get viewW() { return this.canvas.clientWidth; }
   private get viewH() { return this.canvas.clientHeight; }
-  /** The whole hall, floor to bunting, always fits the viewport. */
-  private get scale() { return Math.max(0.75, Math.min(2.4, this.viewH / (WORLD.height + 8))); }
+  /** The whole hall, floor to bunting, always fits the viewport — a phone on its side included. */
+  private get scale() { return Math.max(0.45, Math.min(2.4, this.viewH / (WORLD.height + 8))); }
 
   private bindInput() {
     window.addEventListener('keydown', (e) => {
@@ -101,6 +101,15 @@ export class Scene {
       const t = nearest(this.targets, worldX, floor, 74);
       this.walkTo = t ? { x: t.x, floor: t.floor, then: t } : { x: worldX, floor };
     });
+  }
+
+  /** The on-screen action button: what ↑ or ↓ would do here. */
+  act() {
+    if (this.frozen || this.climbing) return;
+    this.walkTo = null;
+    const t = nearest(this.targets, this.player.x, this.player.floor);
+    if (t) this.onInteract?.(t);
+    else this.tryDescend();
   }
 
   private tryInteract() {
@@ -204,7 +213,10 @@ export class Scene {
     this.camera = Math.max(0, Math.min(WORLD.width - this.viewW / this.scale, this.camera));
 
     this.fx.update(dt);
-    this.onPrompt?.(this.frozen ? null : nearest(this.targets, p.x, p.floor));
+    this.onPrompt?.(
+      this.frozen ? null : nearest(this.targets, p.x, p.floor),
+      !this.frozen && !this.climbing && Math.abs(p.x - WORLD.ladderX) <= 34,
+    );
   }
 
   private drawActor(ctx: CanvasRenderingContext2D, a: Actor, y: number) {

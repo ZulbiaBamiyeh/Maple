@@ -26,7 +26,7 @@ export class DummyWindow {
   private flashes = el('div', 'statlist');
 
   constructor(private run: Run) {
-    this.win = makeWindow('Training Dummy', { x: 60, y: 90, width: 262 });
+    this.win = makeWindow('Training Dummy', { x: 60, y: 90, width: 262, dock: 'left' });
     this.win.body.append(this.bars, this.flashes, this.feed, this.startBtn);
     this.startBtn.addEventListener('click', () => this.begin());
   }

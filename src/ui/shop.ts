@@ -20,7 +20,7 @@ export class ShopPanel {
   private stall!: Stall;
 
   constructor(private run: Run, private onChange: () => void) {
-    this.win = makeWindow('Stall', { x: 300, y: 60, width: 430 });
+    this.win = makeWindow('Stall', { x: 300, y: 60, width: 430, cls: 'w-shop' });
 
     const stockPanel = el('div', 'panel');
     stockPanel.append(this.head, this.stock);

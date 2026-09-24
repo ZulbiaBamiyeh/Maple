@@ -8,20 +8,40 @@ import { clear, el, mesos } from './dom';
  * green passive and proc text. §9.2
  */
 let tip: HTMLElement;
+/** A tip opened by a long press stays up after the finger lifts, until the next tap. */
+let pinned = false;
+let lastTouch = false;
 
 export function initTooltip() {
   tip = el('div');
   tip.id = 'tip';
   document.body.append(tip);
-  window.addEventListener('pointermove', move);
+  window.addEventListener('pointermove', (e) => { if (!pinned) move(e.clientX, e.clientY, e.pointerType === 'touch'); });
+  window.addEventListener('pointerdown', (e) => {
+    lastTouch = e.pointerType === 'touch';
+    if (pinned && !tip.contains(e.target as Node)) hideTip();
+  }, true);
 }
 
-function move(e: PointerEvent) {
+/** Whether the last press came from a finger — a long press is not a right-click. */
+export function wasTouch(): boolean { return lastTouch; }
+
+function move(cx: number, cy: number, finger = false) {
   if (tip.style.display !== 'block') return;
   const w = tip.offsetWidth, h = tip.offsetHeight;
-  let x = e.clientX + 16, y = e.clientY + 18;
-  if (x + w > window.innerWidth - 6) x = e.clientX - w - 14;
-  if (y + h > window.innerHeight - 6) y = Math.max(6, e.clientY - h - 12);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x: number, y: number;
+  if (finger) {
+    // Above the finger, so the thumb doesn't cover what it is asking about.
+    x = Math.max(6, Math.min(vw - w - 6, cx - w / 2));
+    y = cy - h - 28;
+    if (y < 6) y = Math.min(vh - h - 6, cy + 28);
+    if (y < 6) y = 6;
+  } else {
+    x = cx + 16; y = cy + 18;
+    if (x + w > vw - 6) x = cx - w - 14;
+    if (y + h > vh - 6) y = Math.max(6, cy - h - 12);
+  }
   tip.style.left = x + 'px';
   tip.style.top = y + 'px';
 }
@@ -70,13 +90,68 @@ export function showItemTip(it: Item, opts: TipOptions = {}) {
 
 export function hideTip() {
   tip.style.display = 'none';
+  tip.classList.remove('pinned');
+  pinned = false;
 }
 
-/** Wires hover on any element that stands for an item. */
-export function bindTip(node: HTMLElement, get: () => { item: Item; opts?: TipOptions } | null) {
-  node.addEventListener('pointerenter', () => {
+const HOLD_MS = 380;
+
+/**
+ * Wires hover on any element that stands for an item. A finger has no hover, so
+ * on a touchscreen the tip comes up on a long press instead — and a tap still
+ * does whatever tapping the item does. `action` adds a button to the pinned
+ * tip for what a mouse does with a right-click.
+ */
+export function bindTip(
+  node: HTMLElement,
+  get: () => { item: Item; opts?: TipOptions } | null,
+  action?: { label: string; run: () => void },
+) {
+  node.addEventListener('pointerenter', (e) => {
+    if (e.pointerType === 'touch') return;
     const data = get();
     if (data) showItemTip(data.item, data.opts);
+    move(e.clientX, e.clientY);
   });
-  node.addEventListener('pointerleave', hideTip);
+  node.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') hideTip(); });
+
+  let hold = 0;
+  let held = false;
+  let sx = 0, sy = 0;
+  const cancel = () => { clearTimeout(hold); hold = 0; };
+  node.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch') return;
+    held = false;
+    sx = e.clientX; sy = e.clientY;
+    cancel();
+    hold = window.setTimeout(() => {
+      hold = 0;
+      const data = get();
+      if (!data) return;
+      held = true;
+      showItemTip(data.item, data.opts);
+      pinned = true;
+      tip.classList.add('pinned');
+      if (action) {
+        const btn = el('button', 'btn small tip-act', action.label);
+        btn.addEventListener('click', () => { hideTip(); action.run(); });
+        tip.append(btn);
+      }
+      move(sx, sy, true);
+      navigator.vibrate?.(8);
+    }, HOLD_MS);
+  });
+  node.addEventListener('pointermove', (e) => {
+    if (hold && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel();
+  });
+  node.addEventListener('pointerup', cancel);
+  node.addEventListener('pointercancel', cancel);
+  // The press was an inspection, not a tap: swallow the click that follows it.
+  node.addEventListener('click', (e) => {
+    if (!held) return;
+    held = false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }, true);
+  node.addEventListener('contextmenu', (e) => { if (wasTouch()) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 }

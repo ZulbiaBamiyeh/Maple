@@ -125,10 +125,42 @@ async function boot() {
     void rng;
   }
 
-  scene.onPrompt = (t: Target | null) => {
+  // The on-screen buttons, for a hand that has no arrow keys or I key.
+  const padAct = document.getElementById('pad-act') as HTMLButtonElement;
+  const padBag = document.getElementById('pad-bag') as HTMLButtonElement;
+  const padFull = document.getElementById('pad-full') as HTMLButtonElement;
+  let lastPrompt = '';
+  scene.onPrompt = (t: Target | null, atLadder: boolean) => {
+    const key = t ? `t:${t.label}` : atLadder ? 'ladder' : '';
+    if (key === lastPrompt) return;
+    lastPrompt = key;
     hudHint.textContent = t ? `↑  ${t.label}` : '';
     hudHint.style.visibility = t ? 'visible' : 'hidden';
+    padAct.textContent = t ? t.label : atLadder ? 'climb' : '';
+    padAct.disabled = !t && !atLadder;
   };
+  padAct.addEventListener('click', () => scene.act());
+  padBag.addEventListener('click', () => {
+    if (inventory.win.isOpen) inventory.win.close();
+    else inventory.open();
+    scene.frozen = anyOpen();
+  });
+  const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
+  if (document.fullscreenEnabled) {
+    padFull.addEventListener('click', async () => {
+      if (document.fullscreenElement) return void document.exitFullscreen();
+      try {
+        await root.requestFullscreen({ navigationUI: 'hide' });
+        await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.('landscape');
+      } catch { /* not allowed here; the button is a nicety */ }
+    });
+  } else {
+    padFull.remove();
+  }
+  document.getElementById('rotate-skip')!.addEventListener('click', () => {
+    document.documentElement.classList.add('upright-ok');
+  });
+  document.getElementById('loading')?.remove();
 
   scene.onInteract = (t: Target) => {
     if (anyOpen()) return;

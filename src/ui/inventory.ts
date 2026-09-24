@@ -40,11 +40,11 @@ export class InventoryPanel {
   private activeTab = 0;
 
   constructor(private run: Run, private onChange: () => void) {
-    this.win = makeWindow('Equipment Inventory', { x: 40, y: 66, width: 250 });
+    this.win = makeWindow('Equipment Inventory', { x: 40, y: 66, width: 250, dock: 'left', cls: 'w-equip' });
     this.board.append(figure());
     this.win.body.append(this.board, wrapPanel(this.stats));
 
-    this.itemWin = makeWindow('Item Inventory', { x: 320, y: 66, width: 188 });
+    this.itemWin = makeWindow('Item Inventory', { x: 320, y: 66, width: 188, dock: { after: this.win } });
     TABS.forEach((name, i) => {
       const tab = el('div', 'tab' + (i === 0 ? ' on' : ''), name);
       tab.addEventListener('click', () => {
@@ -110,14 +110,17 @@ export class InventoryPanel {
         img.src = getItemIcon(it.iconKey);
         cell.append(img);
         if (worn.has(id) && k === 0) cell.append(el('div', 'tag', 'E'));
-        bindTip(cell, () => ({ item: it }));
-        cell.addEventListener('click', () => { equip(run, it); this.render(); this.onChange(); });
-        cell.addEventListener('contextmenu', (e) => {
-          e.preventDefault();
+        const sell = () => {
           sellToStall(run, it);
           hideTip();
           this.render();
           this.onChange();
+        };
+        bindTip(cell, () => ({ item: it }), { label: 'sell to shop', run: sell });
+        cell.addEventListener('click', () => { equip(run, it); this.render(); this.onChange(); });
+        cell.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          sell();
         });
         this.bag.append(cell);
         shown++;

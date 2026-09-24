@@ -70,7 +70,7 @@ export class TradeWindow {
   onChallenge?: (h: Hawker) => void;
 
   constructor(private run: Run, private onChange: () => void, private onClosed: () => void) {
-    this.win = makeWindow('Trade', { x: 170, y: 70, width: 386 });
+    this.win = makeWindow('Trade', { x: 170, y: 70, width: 386, dock: 'left', cls: 'w-trade' });
 
     this.theirSide.append(this.theirPortrait, this.theirName, this.theirGrid, panelWrap(this.theirMesos));
     this.mySide.append(this.myPortrait, this.myName, this.myGrid, panelWrap(this.myMesos));
@@ -112,7 +112,7 @@ export class TradeWindow {
     this.tradeBtn.addEventListener('click', () => this.pressTrade());
     this.win.onClose = () => { if (!this.closing) this.finish('left'); };
 
-    this.bagWin = makeWindow('Items', { x: 580, y: 70, width: 184 });
+    this.bagWin = makeWindow('Items', { x: 580, y: 70, width: 184, dock: 'right' });
     const bagPanel = el('div', 'panel');
     bagPanel.append(this.bagGrid);
     const mesoRow = el('div', 'chatin');

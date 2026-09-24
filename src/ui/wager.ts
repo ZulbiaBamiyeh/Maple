@@ -48,7 +48,7 @@ export class WagerWindow {
     private onChange: () => void,
     private onClosed: () => void,
   ) {
-    this.win = makeWindow('Wager', { x: 600, y: 70, width: 380 });
+    this.win = makeWindow('Wager', { x: 600, y: 70, width: 380, dock: 'right', cls: 'w-wager' });
 
     const head = el('div', 'trade-grid');
     const left = el('div', 'side');
