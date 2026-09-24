@@ -4,12 +4,13 @@
 import { Run, randomLook, savedGhosts } from './game.js';
 import { Rng } from './rng.js';
 import { showBattle } from './ui/battle.js';
-import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
+import { titleScreen, pickScreen, gearScreen, lootScreen, shopScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
+import { eventScreen } from './ui/event.js';
 import { toast, closeSheet } from './ui/common.js';
 import { installTooltips } from './ui/tooltip.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
-import { ROUNDS_PER_DAY } from './data.js';
+import { ROUNDS_PER_DAY, DAYS_IN_RUN } from './data.js';
 
 const app = document.getElementById('app');
 installTooltips();
@@ -38,11 +39,12 @@ function keepGhost(run) {
 }
 
 // Screens that are safe to resume on. A battle resumes on whatever comes after it.
-const RESUMABLE = new Set(['pick', 'gear', 'loot', 'end']);
+const RESUMABLE = new Set(['pick', 'gear', 'loot', 'shop', 'event', 'end']);
 
 function readSave() {
   const data = load('run');
-  if (!data || data.perDay !== ROUNDS_PER_DAY) return null; // saved under an older day layout
+  // Saved under an older day layout (3-round or 5-day runs): start fresh.
+  if (!data || data.perDay !== ROUNDS_PER_DAY || (data.days ?? 5) !== DAYS_IN_RUN) return null;
   const run = Run.fromJSON(data.run);
   if (!run) return null;
   return { run, screen: data.screen, opts: data.opts || {}, name: run.name, round: run.round };
@@ -110,6 +112,7 @@ const ctx = {
 
   afterLoot() {
     if (ctx.run.over) return finishRun();
+    if (ctx.run.event) return ctx.go('event');
     ctx.go('gear', { mode: 'hub' });
   },
   nextRound() {
@@ -117,6 +120,14 @@ const ctx = {
     ctx.go(ctx.run.isDuel ? 'gear' : 'pick', ctx.run.isDuel ? { mode: 'duel' } : {});
   },
   openMenu() { menuSheet(ctx); },
+  leaveEvent() {
+    ctx.run.endEvent();
+    ctx.go('gear', { mode: 'hub' });
+  },
+  leaveShop() {
+    ctx.run.leaveShop();
+    ctx.nextRound();
+  },
 };
 
 function startFight(mobId) {
@@ -126,9 +137,9 @@ function startFight(mobId) {
   if (run.isDuel) keepGhost(run);
   const fight = run.fight(mobId);
   const out = run.resolve();
-  const next = run.over ? 'end' : run.loot ? 'loot' : 'gear';
+  const next = run.over ? 'end' : run.loot ? 'loot' : run.shop ? 'shop' : run.event ? 'event' : 'gear';
   // Save the outcome now, pointing at the screen that follows the battle.
-  if (!seedParam) save('run', { run, screen: next, opts: next === 'gear' ? { mode: 'hub' } : {}, perDay: ROUNDS_PER_DAY });
+  if (!seedParam) save('run', { run, screen: next, opts: next === 'gear' ? { mode: 'hub' } : {}, perDay: ROUNDS_PER_DAY, days: DAYS_IN_RUN });
   if (run.over) recordBest(run);
   ctx.screen = 'battle';
   ctx.opts = { fight, out, before };
@@ -143,8 +154,11 @@ function afterBattle() {
   if (out.lifeLost) toast('−1 life', 'bad');
   if (out.won && out.duel && !run.over) toast(`Duel won · record ${run.record}`, 'good');
   if (out.draw) toast('Draw — no life lost');
+  if (out.gold) toast(`+${out.gold} gold`, 'gold');
   if (run.over) return ctx.go('end');
   if (run.loot) return ctx.go('loot');
+  if (run.shop) return ctx.go('shop');
+  if (run.event) return ctx.go('event');
   ctx.go('gear', { mode: 'hub' });
 }
 
@@ -159,7 +173,7 @@ function recordBest(run) {
   const b = ctx.best || { runs: 0, crowns: 0, bestWins: 0 };
   b.runs++;
   if (run.crown) b.crowns++;
-  b.bestWins = Math.max(b.bestWins, run.wins);
+  b.bestWins = Math.max(b.bestWins, run.duelWins ?? 0);
   ctx.best = b;
   save('best', b);
 }
@@ -168,7 +182,7 @@ function persist() {
   if (seedParam) return; // seeded test runs don't touch the real save
   if (!ctx.run) return;
   if (RESUMABLE.has(ctx.screen)) {
-    save('run', { run: ctx.run, screen: ctx.screen, opts: { mode: ctx.opts.mode }, perDay: ROUNDS_PER_DAY });
+    save('run', { run: ctx.run, screen: ctx.screen, opts: { mode: ctx.opts.mode, back: ctx.opts.back }, perDay: ROUNDS_PER_DAY, days: DAYS_IN_RUN });
   }
 }
 
@@ -179,6 +193,7 @@ function render() {
     case 'gear': return gearScreen(app, ctx, ctx.opts);
     case 'loot': return lootScreen(app, ctx);
     case 'shop': return shopScreen(app, ctx);
+    case 'event': return eventScreen(app, ctx);
     case 'end': return endScreen(app, ctx);
     case 'battle': return showBattle(app, ctx.run, ctx.opts.fight, afterBattle, {
       before: ctx.opts.before, out: ctx.opts.out, speed: ctx.speed,

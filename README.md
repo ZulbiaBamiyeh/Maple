@@ -7,7 +7,7 @@ A phone auto-battler about loot. Choose which monster to hunt, equip what it dro
 This is prototype v0.1, built to the design manuscript in [docs/gearfall-design.md](docs/gearfall-design.md).
 
 > The previous project in this repo (Lantern Row) is parked, unused, in [`backup/lantern-row/`](backup/lantern-row/).
-> The shop, scrolls and gold are parked in [`backup/gearfall-shop-scrolls/`](backup/gearfall-shop-scrolls/).
+> The old scroll upgrades are parked in [`backup/gearfall-shop-scrolls/`](backup/gearfall-shop-scrolls/); the shop and gold are back.
 
 ## Play it
 
@@ -22,17 +22,17 @@ Open it at phone width (portrait). Add `?seed=123` to replay a run exactly.
 
 ```sh
 npm test                      # combat, full-run, save and ghost tests
-node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rate
+node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rate, greedy vs builder
 ```
 
 ## What's in
 
 | | |
 |---|---|
-| **The run** | 5 days and 3 lives. Each day is three hunts and then a duel (20 rounds). Only a lost duel costs a life. Win the day-5 duel for a Crown. |
-| **Days** | Mossy Meadow, Tidal Shore, Clockwork Ruins, Haunted Moor and Dragon Peak. Each day has its own 6 monsters (2 Easy, 2 Normal, 2 Elite), its own backdrop, and a title card when it starts. The HUD shows today's four rounds as pips and folds every other day into one numbered pip, coloured by that day's duel result. Later days roll fewer commons. |
-| **Hunts** | One Easy, one Normal and one Elite mob to choose from each round. Each card shows HP, hit, trait, drop table and rarity odds. After a win you pick 1 of 3 random drops from its table. A loss just means no drop: hunts are for loot, and lives are lost only in duels. Easy monsters are a safety net: they are tuned so even a weak build wins about 80% of the time, but their drops stay mostly Common every day. The Rare and Epic gear (perks, relics) comes from Normal and Elite. |
-| **Duels** | Blind before the fight, as in The Bazaar: the rival is a silhouette with a name and record. Once the fight starts, tap **BUILD** on their HP panel to pause and inspect their gear. After the fight, **Their build** sits next to Continue. A win adds to your record and gives no items, since gear only comes from hunts. The 15 hand-written ghosts are 3 per duel round, and some of the later ones carry relics. Hand-written rivals' gear rolls at the duel's own numbers. Monster and gear numbers grow per day (+36%), spread across the day's rounds, so every duel sits at the same strength however many hunts come before it. |
+| **The run** | Win 5 duels for the Crown; lose 3 and the run is over. Each day is three hunts and then a duel, for up to 7 days (28 rounds), so 7 duels at most. Reaching 5 wins ends the run early with the Crown. Only a lost duel costs a life. |
+| **Biomes** | 10 biomes: Mossy Meadow, Tidal Shore, Clockwork Ruins, Haunted Moor, Dragon Peak, Sunscorch Desert, Barberry Orchard, Frostfang Glacier, Mirebog Swamp and Starfall Observatory. Each run draws 7 of them in a random order, one per day, never the same one twice. Each biome has its own 6–7 monsters (Easy, Normal, Elite), gear families, a keystone and a backdrop. A monster's strength comes from the day it lands on, not the biome, so any biome can open or close a run. The HUD shows today's four rounds as pips and folds every other day into one numbered pip, coloured by that day's duel result, plus duel wins (x/5) and gold. Later days roll fewer commons. |
+| **Hunts** | One Easy, one Normal and one Elite mob to choose from each round. Each card shows HP, hit, trait, drop table (keystones rimmed teal, relics gold), rarity odds and how far you are into that family's set. After a win you pick 1 of 3 random drops from its table, and once a day you can reroll the three. A loss just means no drop: hunts are for loot, and lives are lost only in duels. Easy monsters are a safety net: they are tuned so even a weak build wins about 80% of the time, but their drops stay mostly Common every day. The Rare and Epic gear (perks, relics, keystones) comes from Normal and Elite. |
+| **Duels** | Blind before the fight, as in The Bazaar: the rival is a silhouette with a name and record. Once the fight starts, tap **BUILD** on their HP panel to pause and inspect their gear. After the fight, **Their build** sits next to Continue. A win adds to your record and pays 6 gold (a loss pays 3). The 21 hand-written ghosts are 3 per duel round, and the later ones carry relics, keystones and full sets. Hand-written rivals' gear rolls at the duel's own numbers. Monster and gear numbers grow per day (+36%), spread across the day's rounds, so every duel sits at the same strength however many hunts come before it. |
 | **Combat** | `simulate(a, b, seed)` in [src/sim.js](src/sim.js) is a pure function on fixed 50 ms ticks with seeded mulberry32. It covers all 6 weapon types and 13 statuses (including Shock, Hex and the relics' Gilded), evasion, crit damage, armour pierce, thorns, conditional damage (vs a status, execute, rage), detonations, every trigger, overtime and draws. The battle screen only replays its frames and events at 1×, 2× or Skip. |
 | **Battle feel** | Fighters slide in under a FIGHT! callout. Each attack winds up, dashes in and strikes on the exact tick its damage lands. Every weapon and monster attacks its own way: sword and axe arcs, spear thrusts, magic bolts, slime hops, boar charges and golem slams. Hits bring flashes, knockback, sparks, screen shake on crits, popping damage numbers and status icons. A KO bursts the loser into pixels while the winner hops. The HP bars sit inside the arena. |
 | **Odds** | Hunt cards show your chances against each monster with your current gear, in five bands from Deadly to Easy win. They come from practice fights on seeds the real fight never uses. Duels show no odds and no gear, so you can't solve a rival before fighting them. |
@@ -43,13 +43,16 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 | **Gear screen** | The hero stage is kept compact. Under it, DPS and EHP are shown big, and every stat (HP, Atk, Def, Crit, Crit damage, Haste, Resist, Evasion, Lifesteal, Regen, Thorns, Pierce) gets an icon cell. Unused stats are dimmed. Before a duel, only the 8 most relevant stats show. |
 | **Text** | Pixel fonts are kept for titles, names and battle pop-ups. Everything you read (stats, item lines, the log) uses Nunito at 12–15 px. |
 | **Animation** | Idle is a two-frame pixel breath: a hero's upper body sinks 1 px with the feet planted, and monsters squash 1 px. The whole sprite never bobs. |
-| **Help** | A short popup the first time each screen appears, and no permanent tutorial text. The ≡ menu has How to play (every stat and status explained), Show intro popups again, and Abandon run. |
-| **Battle clarity** | New statuses pop up in a small stack under that fighter's HP panel, well away from the damage numbers. Damage numbers take whichever of five slots above the head has been free longest, so bursts fan out instead of piling up. |
+| **Help** | No tutorial popups. The ≡ menu has a short How to play (every stat and status in a line) and Abandon run. |
+| **Battle clarity** | New statuses pop up in a small stack under that fighter's HP panel, well away from the damage numbers. Status chips are kept per status and only their count and timer update, so each chip pops in once and never swells over its neighbours. Damage numbers take whichever of five slots above the head has been free longest, so bursts fan out instead of piling up. |
 | **Readability** | Status chips have stack counts and draining timers. Damage numbers are colour-coded, and an attack-timer bar sits under each HP bar. After every fight a donut chart breaks down your damage by type (hits, crits, shock, burn, poison, bleed, thorns, overclock), with a Dealt / Taken toggle. Tap or hover a slice or legend row to read it out in the middle. Colours are fixed per type and ordered so neighbouring slices stay distinct for colour-blind players, and every slice is also named in the legend. |
-| **Builds** | 12 new monster families each bring a set and a status or mechanic: Reefguard thorns, Stormscale shock, Pearlescent shields, Mainspring speed, Corrosion armour-break, Overcharge, Ossuary crits, Witchmark hex, Umbral evasion, Dragonblood, Tempest and Prism. |
+| **Builds** | 28 monster families, each with a 2-piece and a 4-piece set bonus. The 2-piece is a stat or small mechanic (Reefguard thorns, Stormscale shock, Pearlescent shields, and so on). The 4-piece bends a rule: Gelheart's Regen ticks Poison, Rimebound's +Crit per Chill, Bedrock turns Def into Atk, Reefguard's Thorns carry your on-hit statuses, Stormscale's full Shock bar discharges, Ossuary's crits feed every status, Witchmark's damage per status on the foe, Starlit's crits refund half a swing. |
 | **Perks** | Rare items have a 40% chance of a ✦ perk, and epics always have one plus a 25% chance of a second. Perks are niche payoffs such as +dmg vs Poisoned, a poison burst every 4th hit, shock on crit, execute, rage, an opening shield or a riposte on dodge. They lean towards the item's own status. |
-| **Relics** | Every elite guards one rule-bending trinket, gold-rimmed on its card and never common. **Gilded Hourglass**: below 40% HP you turn to gold for 3s, untouchable and frozen, while your Poison and Burn deal double. **Plague Censer**: DoTs tick every 0.6s. **Ebb Shell**: shields never fade. **Echo Conch**: statuses land twice. **Overclock Core**: haste that costs HP. **Bottled Storm**: Shock never fades. **Bloodpact Chalice**: heals hurt the foe. **Cursed Mirror**: reflects statuses. **Phoenix Feather**: revive once. **Glass Heart**: +50% dealt, +25% taken. |
-| **Gear** | Items come in 3 rarities with affixes. Wearing 2 pieces from one mob family unlocks its set bonus. There's a 6-slot bag; you can discard pieces to make room. The shop, scrolls and gold are parked in `backup/gearfall-shop-scrolls/`. |
+| **Relics** | Every elite guards one rule-bending trinket, gold-rimmed on its card and never common. **Gilded Hourglass**: below 40% HP you turn to gold for 3s, untouchable and frozen, while your Poison and Burn deal double. **Plague Censer**: DoTs tick every 0.6s. **Ebb Shell**: shields never fade. **Echo Conch**: statuses land twice. **Overclock Core**: haste that costs HP. **Bottled Storm**: Shock never fades. **Bloodpact Chalice**: heals hurt the foe. **Cursed Mirror**: reflects statuses. **Phoenix Feather**: revive once. **Glass Heart**: +50% dealt, +25% taken. **Sunstone Idol**: burst all Poison every 3s. **Royal Jelly**: steady heals that also hurt. **Heart of Winter**: Chill freezes at 2 stacks, and the fight opens with 2 Chill. |
+| **Keystones** | One per biome, dropped by one of its Normal monsters and one Elite, teal-tagged and never common. Each changes a rule: Mycelial Heart (Regen poisons), Pearl Bulwark (hits add half your Shield), Tesla Coil (full Shock discharges), Bloodletter (Bleed heals you), Juggernaut Plate (Def becomes Atk), Dervish Slippers (dodges stack Atk), Briar Crown (Thorns carry your statuses), Frostbite Gauntlets (+Crit per Chill), Plague Doctor Mask (+damage per status on the foe), Star Splitter (crits feed every status). Several share a rule with a family's 4-piece, so a keystone plus a set doubles down. |
+| **Shop** | Moss the merchant sets up after the day-2 and day-5 duels with 5 wares, each there for a reason: pieces for sets you've started, a twin of something you own (to merge), a keystone, and gear from tomorrow's biome. Gold comes from hunts (2/3/5 by tier), duels and selling. A reroll costs 3 gold. |
+| **Events** | Four a run, between hunts, each a first-person scene with an animated character (8 frames, drawn in code like the monsters): the **Gremlin Trader** swaps an item for a random one that may be better or worse, the **Crimson Bargain** sells a keystone for a life or a relic for a max-HP curse, the **Ghostly Tailor** re-stitches an item into the family you're building, the **Dwarf Smith** reforges or hones, **A Suspicious Chest** may be a mimic, the **Echo Shrine** copies an item (to merge) for a curse, and the **Fortune Well** takes a gamble. Curses and blessings last the whole run. |
+| **Gear** | Items come in 3 rarities with affixes. There's a 6-slot bag; spare pieces sell for gold (1/2/4 by rarity). **Merging**: two copies of the same item at the same rarity merge into one a rarity higher, keeping their affixes and perks and always carrying at least one perk. Relics and Epics don't merge. |
 | **Comparisons** | Every item sheet shows `DPS a → b ▲` and `EHP a → b ▼` against what you're wearing now. |
 
 ## Art
@@ -64,19 +67,21 @@ The art goes beyond the manuscript's samples in these ways:
 - **Outlines and shadows are automatic.** Layers composite with a 1 px contact shadow where they overlap, and the finished silhouette gets the `#1a1423` outline. Mobs are built from ellipses lit from the top-left in flat bands, with no gradients.
 - **The palette is extended.** The manuscript's 20 colours are kept. Skin, hair and material ramps are added so pieces can be shaded in three steps.
 - **Battles take place in scenes.** Day-1 families each have a backdrop (meadow, spore wood, dusk plains, snowfield, cave, volcano). Later days have a shore, clockwork ruins, a haunted moor and a sunset mountain peak, and duels are fought under a moonlit sky.
-- **30 monsters.** Days 2–5 add 24 monsters ([src/art/mobs2.js](src/art/mobs2.js)): crabs, jellyfish, eels, a siren, clockwork knights, a tesla sentinel, bats, skeletons, a moor witch, harpies, a thunder roc, an elder drake and a prism colossus. Trinket and relic icons are painted the same way ([src/art/icons2.js](src/art/icons2.js)). [`tools/mob-sheet.html`](tools/mob-sheet.html) shows every monster.
+- **65 monsters.** [src/art/mobs2.js](src/art/mobs2.js) has crabs, jellyfish, eels, a siren, clockwork knights, a tesla sentinel, bats, skeletons, a moor witch, harpies, a thunder roc, an elder drake and a prism colossus. [src/art/mobs3.js](src/art/mobs3.js) adds the Desert (skink, scarab, scorpion, mummy, sand wyrm, sphinx), the Orchard (berry sprout, bumble bee, thorn hedgehog, honey bear, elder treant, wasp queen), the Glacier (snow puff, penguin, frost wolf, yeti, abominable, frost wyrm), the Swamp (bog toad, swamp leech, mud golem, blood gnats, swamp croc, bog mother), the Observatory (starling, meteorite, orrery sentinel, nova moth, astromancer, meteor golem), and one newcomer for each first-five biome (mushroom knight, pufferfish, scrap hound, jack-o-lurk, lava salamander). Trinket and relic icons are painted the same way ([src/art/icons2.js](src/art/icons2.js)). [`tools/mob-sheet.html`](tools/mob-sheet.html) shows every monster by biome.
 
 ## Layout
 
 ```
 index.html, styles.css
 src/
-  data.js      every item, trinket, status, mob, set and ghost
+  data.js      every item, trinket, status, mob, set, biome and ghost
+  mobpower.js  per-day monster strength (generated by tools/tune.mjs)
   sim.js       the combat simulation (pure)
-  items.js     item rolls, build -> fighter, DPS/EHP, scrolls
+  items.js     item rolls, build -> fighter, DPS/EHP
+  events.js    the random events: planning, offers and outcomes
   game.js      run state machine
   rng.js       seeded RNG + hash
-  art/         palette, compositor, hero paper doll, icons, mobs, scenes, glyphs
+  art/         palette, compositor, hero paper doll, icons, mobs, scenes, event scenes, glyphs
   ui/          screens, battle playback, shared widgets
 tests/         node --test acceptance tests
 tools/         balance bot, art sheet, screenshot/flow scripts
@@ -84,15 +89,16 @@ tools/         balance bot, art sheet, screenshot/flow scripts
 
 ## Balance
 
-Every monster's strength is tuned in `MOB_POWER` ([src/data.js](src/data.js)). [`tools/tune.mjs`](tools/tune.mjs) finds values so that a careful bot wins about 62% of Normal and 42% of Elite hunts on the matching day. Easy monsters are tuned so that a struggling bot (Easy hunts only, random drops) wins about 80%, which leaves careful players at 98–100%. [`tools/probe.mjs`](tools/probe.mjs) prints per-monster win rates.
+Every monster has a strength for each of the 7 days in `MOB_POWER` ([src/mobpower.js](src/mobpower.js)), since its biome can land on any day. [`tools/tune.mjs`](tools/tune.mjs) generates it against builds from bots that hunt carefully, shop and merge, so a careful player wins about 62% of Normal and 42% of Elite hunts on each day. Easy monsters are tuned so that a struggling bot (Easy hunts only, random drops, no shop) wins about 80%. [`tools/tune-duels.mjs`](tools/tune-duels.mjs) sets `GHOST_POWER`, each day's multiplier on the duel rivals, so duels keep pace with shopping and merging. [`tools/probe.mjs`](tools/probe.mjs) prints per-monster win rates. The bots live in [`tools/bots.mjs`](tools/bots.mjs).
 
-Bot results over 150 runs of the 5-day run:
+Bot results (`node tools/balance.mjs 150 40`; win 5 duels before losing 3):
 
-| Strategy | Crown rate |
-|---|---|
-| Careful player (the hardest tier it usually beats) | ~43% |
-| Always Easy (safe, but mostly Common gear) | ~32% |
-| Always Normal | ~8% |
-| Always Elite | ~0% |
+| Strategy | Crown rate | Duel wins |
+|---|---|---|
+| Careful player (the hardest tier it usually beats; judges gear by DPS × EHP) | ~42% | 3.2 |
+| Careful player judging gear by practice fights (sees sets, keystones, perks) | ~50% (40 runs) | 3.2 |
+| Always Normal | ~21% | 1.5 |
+| Always Easy (safe, but mostly Common gear) | ~12% | 2.1 |
+| Always Elite | ~0% | 0 |
 
-Duel win rates for careful play land between 47% and 95% (the first duel is gentle), with the final duel near 50%. The bots score gear only by DPS × EHP, so they undervalue perks and relics. A player who builds around them does better.
+The fight-judging bot doing better than the stat-greedy one is the sign that builds matter beyond raw numbers. Both bots judge one item at a time, though, so neither plans a set or a keystone combo ahead; a player who does should do better still.

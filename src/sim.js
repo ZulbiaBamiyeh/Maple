@@ -70,6 +70,12 @@ export function simulate(specA, specB, seed) {
     const before = f.hp;
     f.hp = Math.min(f.spec.maxHp, f.hp + amt);
     if (f.hp > before) emit({ type: 'heal', dst: f.idx, amt: f.hp - before, source });
+    // Bloodsucker (4): healing past full HP becomes Shield.
+    const over = amt - (f.hp - before);
+    if (over > 0 && f.spec.sets.overhealShield) {
+      f.shield.push({ amt: over, exp: f.spec.sets.shieldKeep ? Infinity : t + 6 * TPS });
+      emit({ type: 'shield', dst: f.idx, amt: over, source: 'Overheal' });
+    }
     // Bloodpact: healing you receive also hurts the foe.
     const foe = other(f);
     if (f.spec.sets.healDamage && f.hp > before && alive(foe)) {
@@ -102,7 +108,7 @@ export function simulate(specA, specB, seed) {
         break;
       }
       case 'bleed':
-        st.bleed = { attacks: 3, dmg: Math.round((5 + (src.spec.sets.bleedBonus || 0)) * sc) };
+        st.bleed = { attacks: 3, dmg: Math.round((5 + (src.spec.sets.bleedBonus || 0)) * sc), src: src.idx };
         break;
       case 'stun': {
         if (st.stun || st.freeze || t < dst.stunImmuneUntil) return;
@@ -137,6 +143,14 @@ export function simulate(specA, specB, seed) {
         const max = 5 + (src.spec.sets.shockMax || 0);
         const per = Math.max(1, Math.round(2 * sc));
         st.shock = { stacks: Math.min(max, (st.shock?.stacks || 0) + (eff.stacks || 1)), left: dur(4), tot: dur(4), per: Math.max(per, st.shock?.per || 0), src: src.idx };
+        // Overload: a full Shock bar discharges into a thunderclap and resets.
+        if (st.shock.stacks >= max && src.spec.sets.overload && src !== dst) {
+          const n = st.shock.stacks;
+          delete st.shock;
+          const r = damage(dst, Math.round(n * src.spec.sets.overload * sc));
+          emit({ type: 'dot', dst: dst.idx, status: 'shock', dmg: r.total, absorbed: r.absorbed, burst: true, immune: r.immune });
+          return;
+        }
         break;
       }
       case 'hex':
@@ -235,6 +249,9 @@ export function simulate(specA, specB, seed) {
     }
   }
 
+  const harmfulCount = (f) => Object.keys(f.st).filter((k) => HARMFUL.has(k)).length;
+  const shieldOf = (f) => f.shield.reduce((s, x) => s + x.amt, 0);
+
   // Situational damage bonuses: vs a status on the target, executes, rage.
   function damageMult(a, d) {
     const m = a.spec.mods;
@@ -244,6 +261,7 @@ export function simulate(specA, specB, seed) {
     if (m.rage && a.hp / a.spec.maxHp < m.rage.below) mult += m.rage.pct;
     if (d.st.hex && a.spec.sets.hexAmp) mult += a.spec.sets.hexAmp;
     if (m.glass) mult += m.glass.out;
+    if (a.spec.sets.statusCount) mult += a.spec.sets.statusCount * harmfulCount(d);
     if (d.spec.mods.glass) mult += d.spec.mods.glass.in;
     return mult;
   }
@@ -257,6 +275,8 @@ export function simulate(specA, specB, seed) {
       // damage can fire a cleanse that removes the bleed, so hold on to it
       const r = damage(a, bleed.dmg);
       emit({ type: 'dot', dst: a.idx, status: 'bleed', dmg: r.total, absorbed: r.absorbed });
+      const bsrc = F[bleed.src ?? 1 - a.idx];
+      if (bsrc !== a && bsrc.spec.sets.bleedHeal && r.total > 0) heal(bsrc, r.total, 'Bleed');
       if (--bleed.attacks <= 0 && a.st.bleed === bleed) delete a.st.bleed;
       if (!alive(a)) return;
     }
@@ -270,16 +290,19 @@ export function simulate(specA, specB, seed) {
     if (ev > 0 && !d.st.stun && !d.st.freeze && rng.chance(ev)) {
       emit({ type: 'dodge', src: a.idx, dst: d.idx });
       if (d.spec.sets.dodgeCrit) d.nextCrit = true;
+      if (d.spec.sets.dodgeRage) d.rage += Math.round(d.spec.sets.dodgeRage * d.spec.scale);
       fireAll(d, 'onDodge');
       return;
     }
-    let hit = rng.int(w.min, w.max) + a.spec.atk;
-    const crit = a.nextCrit || rng.chance(a.spec.crit);
+    let hit = rng.int(w.min, w.max) + a.spec.atk + a.rage;
+    if (a.spec.sets.shieldBash) hit += shieldOf(a) * a.spec.sets.shieldBash;
+    const critChance = a.spec.crit + (a.spec.sets.chillCrit || 0) * (d.st.chill?.stacks || 0);
+    const crit = a.nextCrit || rng.chance(critChance);
     a.nextCrit = false;
     if (crit) hit *= 1.5 + a.spec.critDmg;
     if (a.st.weaken) hit *= 0.75;
     hit *= damageMult(a, d);
-    let def = Math.max(0, d.spec.def - 3 * (d.st.sunder?.stacks || 0) - a.spec.pen);
+    let def = a.spec.sets.pierceAll ? 0 : Math.max(0, d.spec.def - 3 * (d.st.sunder?.stacks || 0) - a.spec.pen);
     if (w.magic) def = Math.floor(def / 2);
     let taken = Math.max(1, Math.round(hit - def));
     const shock = d.st.shock ? d.st.shock.stacks * d.st.shock.per : 0;
@@ -298,11 +321,19 @@ export function simulate(specA, specB, seed) {
     }
     fireAll(a, 'onHit', mult);
     if (crit) fireAll(a, 'onCrit', mult);
+    // Star Splitter / Ossuary (4): a crit feeds every status already on the foe.
+    if (crit && a.spec.sets.critSpread && alive(d)) {
+      for (const id of ['poison', 'burn', 'shock', 'chill', 'sunder']) if (d.st[id]) applyStatus(a, d, { apply: id });
+    }
+    // Starlit (4): a crit refunds half the swing.
+    if (crit && a.spec.sets.critHaste) a.timer = w.interval * 0.5;
     fireAll(a, 'everyNthHit', mult, (tr) => a.hits % tr.trigger.n === 0);
     if (alive(d)) {
       if (d.spec.thorns > 0 && alive(a)) {
         const tr = damage(a, d.spec.thorns);
         emit({ type: 'dot', dst: a.idx, status: 'thorns', dmg: tr.total, absorbed: tr.absorbed, immune: tr.immune });
+        // Briar Crown / Reefguard (4): thorns deliver your on-hit statuses too.
+        if (d.spec.sets.thornsProc) for (const oh of d.spec.onHit) if (alive(a) && rng.chance(oh.chance)) applyStatus(d, a, oh);
       }
       fireAll(d, 'onHitTaken');
     }
@@ -328,6 +359,8 @@ export function simulate(specA, specB, seed) {
         }
         const r = damage(f, Math.round(dmg));
         emit({ type: 'dot', dst: f.idx, status: id, dmg: r.total, absorbed: r.absorbed, crit });
+        const owner = F[s.src ?? 1 - f.idx];
+        if (owner !== f && owner.spec.sets.dotLeech && r.total > 0) heal(owner, Math.round(r.total * owner.spec.sets.dotLeech), cap(id));
       }
       if (st[id] && --s.left <= 0) delete st[id];
     }
@@ -343,6 +376,7 @@ export function simulate(specA, specB, seed) {
     if (f.spec.regen > 0 && --f.regenNext <= 0) {
       f.regenNext = TPS;
       heal(f, f.spec.regen, 'Regen');
+      if (f.spec.sets.regenPoison && alive(other(f))) applyStatus(f, other(f), { apply: 'poison' });
     }
   }
 
@@ -410,7 +444,7 @@ function makeFighter(spec, idx) {
   return {
     spec: s, idx, hp: s.maxHp, shield: [], st: {}, hits: 0, lsAcc: 0, used: new Set(), nextCrit: false,
     timer: s.weapon.firstSwing ?? s.weapon.interval, timerFrac: 0,
-    stunImmuneUntil: -1, regenNext: TPS, revived: false,
+    stunImmuneUntil: -1, regenNext: TPS, revived: false, rage: 0,
   };
 }
 
@@ -437,3 +471,4 @@ function statusList(f) {
 }
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const cap = (s) => s[0].toUpperCase() + s.slice(1);

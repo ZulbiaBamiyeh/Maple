@@ -17,6 +17,11 @@ const BIOMES = {
   moor: { sky: ['#161c2e', '#252f48', '#3e4c66'], far: '#28323e', near: '#1a2028', ground: ['#4e5e4a', '#2e3a30', '#2a2622', '#1a1614'], deco: 'moor' },
   peak: { sky: ['#e8705a', '#ffa46a', '#ffd89a'], far: '#7a4a5e', near: '#4e2e40', ground: ['#8a6a5a', '#5a4038', '#3a2a24', '#241a18'], deco: 'peak' },
   duel: { sky: ['#2d2447', '#4a3b6e', '#8a5a9e'], far: '#4a3b6e', near: '#2d2447', ground: ['#aeb4c8', '#6b6a80', '#44475e', '#2a2238'], deco: 'stars' },
+  desert: { sky: ['#f2a65a', '#ffc98a', '#ffe8b8'], far: '#e0a868', near: '#d09050', ground: ['#f2d48a', '#d0a458', '#b08040', '#7a5a2e'], deco: 'desert' },
+  orchard: { sky: ['#8fd0f0', '#b8e4f8', '#e8f8ff'], far: '#7ab870', near: '#4e9440', ground: ['#86c860', '#4e9440', '#7a4a2c', '#4e2e1d'], deco: 'orchard' },
+  glacier: { sky: ['#bfe0f8', '#d8eefc', '#f2faff'], far: '#a8c8e8', near: '#d8ecfa', ground: ['#ffffff', '#d8ecfa', '#8fb8e0', '#5a7eb0'], deco: 'glacier' },
+  swamp: { sky: ['#2e3a2a', '#44563a', '#6a7a4a'], far: '#3a4a30', near: '#2a3624', ground: ['#5a6a3a', '#3e4a28', '#3a3020', '#22200e'], deco: 'swamp' },
+  observatory: { sky: ['#0e0c2a', '#1e1a4a', '#3a2e6e'], far: '#2a2450', near: '#1a1638', ground: ['#8a86b0', '#5a5680', '#3a3658', '#221e3a'], deco: 'observatory' },
 };
 
 export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
@@ -65,6 +70,15 @@ export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
   } else if (b.deco === 'peak') {
     peaks(ctx, W, groundY, b.far, 22, rnd, '#f4f1ff');
     peaks(ctx, W, groundY, b.near, 12, rnd, null);
+  } else if (b.deco === 'desert') {
+    // a hot sun, a far pyramid, then long low dunes
+    circle(ctx, Math.floor(W * 0.22), Math.floor(groundY * 0.3), 8, '#fff6c8');
+    pyramid(ctx, Math.floor(W * (0.55 + rnd() * 0.25)), groundY - 6, 20, '#c89050', '#a87038');
+    hills(ctx, W, groundY, b.far, 0.35, 10, rnd);
+    hills(ctx, W, groundY, b.near, 0.2, 5, rnd);
+  } else if (b.deco === 'glacier') {
+    peaks(ctx, W, groundY, b.far, 20, rnd, '#ffffff');
+    peaks(ctx, W, groundY, b.near, 9, rnd, null);
   } else {
     // far hills
     hills(ctx, W, groundY, b.far, 0.55, 14, rnd);
@@ -86,6 +100,31 @@ export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
   }
   if (b.deco === 'peak') {
     for (let i = 0; i < W / 8; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY), rnd() > 0.5 ? '#ffc36b' : '#f58a3a');
+  }
+
+  if (b.deco === 'desert') {
+    for (let i = 0; i < 3; i++) cactus(ctx, Math.floor(rnd() * W), groundY, 5 + Math.floor(rnd() * 5));
+  }
+  if (b.deco === 'orchard') {
+    for (let i = 0; i < 3; i++) cloud(ctx, Math.floor(rnd() * W), 6 + Math.floor(rnd() * groundY * 0.3), '#ffffff', rnd);
+    for (let i = 0; i < 5; i++) berryTree(ctx, Math.floor(rnd() * W), groundY, rnd);
+  }
+  if (b.deco === 'swamp') {
+    // fireflies, dead trees and a murky pool
+    for (let i = 0; i < W / 10; i++) px(Math.floor(rnd() * W), Math.floor(groundY * 0.3 + rnd() * groundY * 0.6), '#d8f06a');
+    for (let i = 0; i < 3; i++) deadTree(ctx, Math.floor(rnd() * W), groundY, 12 + Math.floor(rnd() * 8));
+    ctx.fillStyle = 'rgba(160, 200, 120, 0.12)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(Math.floor(rnd() * W) - 20, groundY - 3 - Math.floor(rnd() * 5), 30 + Math.floor(rnd() * 30), 2);
+  }
+  if (b.deco === 'observatory') {
+    for (let i = 0; i < W / 3; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY * 0.8), rnd() > 0.8 ? '#ffd36b' : '#f4f1ff');
+    // a falling star and the observatory dome
+    for (let i = 0; i < 8; i++) px(Math.floor(W * 0.2) + i * 2, 10 + i, i < 2 ? '#ffffff' : '#c8c0ff');
+    dome(ctx, Math.floor(W * (0.6 + rnd() * 0.25)), groundY);
+  }
+  if (b.deco === 'glacier') {
+    for (let i = 0; i < W / 5; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY), '#ffffff');
+    for (let i = 0; i < 4; i++) crystal(ctx, Math.floor(rnd() * W), groundY - 1, '#8fd8f0');
   }
 
   if (b.deco === 'crystals') {
@@ -217,4 +256,57 @@ function shellDeco(ctx, x, y, rnd) {
   ctx.fillStyle = rnd() > 0.5 ? '#ff9c8a' : '#f0dcef';
   ctx.fillRect(x, y, 3, 1);
   ctx.fillRect(x + 1, y - 1, 1, 1);
+}
+
+function pyramid(ctx, cx, baseY, h, lit, shade) {
+  for (let y = 0; y < h; y++) {
+    const w = h - y;
+    ctx.fillStyle = lit;
+    ctx.fillRect(cx - w, baseY - y, w, 1);
+    ctx.fillStyle = shade;
+    ctx.fillRect(cx, baseY - y, w, 1);
+  }
+}
+
+function cactus(ctx, x, groundY, h) {
+  ctx.fillStyle = '#4e9440';
+  ctx.fillRect(x, groundY - h, 3, h);
+  ctx.fillRect(x - 2, groundY - h + 2, 2, 1);
+  ctx.fillRect(x - 2, groundY - h, 1, 3);
+  ctx.fillRect(x + 3, groundY - h + 3, 2, 1);
+  ctx.fillRect(x + 4, groundY - h + 1, 1, 3);
+  ctx.fillStyle = '#86c860';
+  ctx.fillRect(x, groundY - h, 1, h);
+}
+
+function berryTree(ctx, x, groundY, rnd) {
+  const h = 8 + Math.floor(rnd() * 6);
+  ctx.fillStyle = '#7a4a2c';
+  ctx.fillRect(x + 3, groundY - h + 4, 2, h - 4);
+  circle(ctx, x + 4, groundY - h + 2, 5, '#3d7f37');
+  circle(ctx, x + 3, groundY - h + 1, 3, '#5fa84a');
+  ctx.fillStyle = '#d63a5a';
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + Math.floor(rnd() * 9), groundY - h - 1 + Math.floor(rnd() * 6), 1, 1);
+}
+
+function deadTree(ctx, x, groundY, h) {
+  ctx.fillStyle = '#1e2618';
+  ctx.fillRect(x, groundY - h, 2, h);
+  ctx.fillRect(x - 3, groundY - h + 3, 3, 1);
+  ctx.fillRect(x - 3, groundY - h + 1, 1, 2);
+  ctx.fillRect(x + 2, groundY - h + 5, 3, 1);
+  ctx.fillRect(x + 4, groundY - h + 2, 1, 3);
+}
+
+function dome(ctx, cx, groundY) {
+  ctx.fillStyle = '#3a3658';
+  ctx.fillRect(cx - 9, groundY - 10, 18, 10);
+  circle(ctx, cx, groundY - 10, 8, '#5a5680');
+  ctx.fillStyle = '#1a1638';
+  ctx.fillRect(cx - 1, groundY - 18, 3, 8);
+  ctx.fillStyle = '#8a86b0';
+  ctx.fillRect(cx + 1, groundY - 21, 5, 2);
+  ctx.fillStyle = '#ffd36b';
+  ctx.fillRect(cx - 5, groundY - 6, 2, 2);
+  ctx.fillRect(cx + 4, groundY - 6, 2, 2);
 }

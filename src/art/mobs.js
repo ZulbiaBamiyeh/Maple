@@ -5,6 +5,7 @@
 
 import { compose } from './pixel.js';
 import { MORE_MOBS } from './mobs2.js';
+import { NEW_MOBS } from './mobs3.js';
 
 const W = 32, H = 32;
 
@@ -269,7 +270,7 @@ function imp() {
   return p.rows();
 }
 
-const BUILDERS = { slime, shroom, boar, wisp, golem, imp, ...MORE_MOBS };
+const BUILDERS = { slime, shroom, boar, wisp, golem, imp, ...MORE_MOBS, ...NEW_MOBS };
 
 export function mobGrid(sprite) {
   // Builders return a Painter (or, for the first six, its rows).

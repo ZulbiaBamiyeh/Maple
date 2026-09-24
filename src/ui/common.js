@@ -6,7 +6,7 @@ import { iconGrid, ICON_SIZE } from '../art/icons.js';
 import { mobGrid, MOB_SIZE } from '../art/mobs.js';
 import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
-import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES, DAYS_IN_RUN, ROUNDS_PER_DAY, dayOf, slotOf } from '../data.js';
+import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES, DAYS_IN_RUN, ROUNDS_PER_DAY, WIN_TARGET, dayOf, slotOf } from '../data.js';
 import { tipSeen, markTip } from './store.js';
 import { registerTip } from './tooltip.js';
 
@@ -108,7 +108,13 @@ export function hud(run) {
   return `<header class="hud">
     <div class="lives" aria-label="${run.lives} lives">${hearts}</div>
     <div><div class="pips">${pips.join('')}</div><div class="round-label">DAY ${dayOf(run.round)}/${DAYS_IN_RUN} · ${run.isDuel ? 'DUEL' : `HUNT ${slotOf(run.round)}/${ROUNDS_PER_DAY - 1}`}</div></div>
-    <div class="hud-r"><button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button></div>
+    <div class="hud-r">
+      <div class="hud-stats num">
+        <span class="wins" aria-label="${run.duelWins ?? 0} of ${WIN_TARGET} duel wins">${glyph('crown', 1)}${run.duelWins ?? 0}/${WIN_TARGET}</span>
+        <span class="gold" aria-label="${run.gold ?? 0} gold">${glyph('coin', 1)}${run.gold ?? 0}</span>
+      </div>
+      <button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button>
+    </div>
   </header>`;
 }
 
