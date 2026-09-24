@@ -98,14 +98,20 @@ export function hud(run) {
 
 // ---------------------------------------------------------------- sheet
 
-export function openSheet(html, bind) {
+// onClose runs when the sheet is dismissed (not when another sheet replaces it).
+let sheetClosed = null;
+export function openSheet(html, bind, onClose = null) {
   const root = document.getElementById('sheet-root');
   root.innerHTML = `<div class="scrim"></div><div class="sheet" role="dialog"><div class="grab"></div>${html}</div>`;
   root.querySelector('.scrim').onclick = closeSheet;
+  sheetClosed = onClose;
   bind?.(root.querySelector('.sheet'));
 }
 export function closeSheet() {
   document.getElementById('sheet-root').innerHTML = '';
+  const cb = sheetClosed;
+  sheetClosed = null;
+  cb?.();
 }
 
 export function toast(msg, kind = '') {

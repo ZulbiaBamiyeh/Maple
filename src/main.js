@@ -4,7 +4,7 @@
 import { Run, randomLook, savedGhosts } from './game.js';
 import { Rng } from './rng.js';
 import { showBattle } from './ui/battle.js';
-import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet } from './ui/screens.js';
+import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
 import { toast, closeSheet } from './ui/common.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
@@ -176,6 +176,7 @@ function render() {
     case 'battle': return showBattle(app, ctx.run, ctx.opts.fight, afterBattle, {
       before: ctx.opts.before, out: ctx.opts.out, speed: ctx.speed,
       onSpeed: (v) => { ctx.speed = v; save('speed', v); },
+      showFoe: (onClose) => buildSheet(ctx, onClose),
     });
     default: return titleScreen(app, ctx);
   }

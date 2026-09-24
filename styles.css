@@ -452,3 +452,32 @@ h2 { font-size: 20px; line-height: 1.1; }
   animation: bob 1s steps(1) infinite;
 }
 .foe .kicker { font-family: var(--num); font-size: 10px; color: var(--gold); letter-spacing: 1px; }
+
+/* Rival build: peek chip during a duel, and the build sheet */
+.ov .nmrow { align-items: center; }
+.peek {
+  flex: none; font-family: var(--num); font-size: 9px; letter-spacing: .5px; color: var(--gold);
+  background: #1a1423; border: 1px solid var(--gold-d); border-radius: 3px; padding: 3px 5px; cursor: pointer;
+  position: relative;
+}
+.peek::before { content: ''; position: absolute; inset: -10px -6px; } /* bigger tap area */
+.bar .txt {
+  position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--num); font-size: 9px; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 1px 1px 0 #0f0b16, -1px -1px 0 #0f0b16, 1px -1px 0 #0f0b16, -1px 1px 0 #0f0b16;
+}
+.arena.paused canvas { filter: brightness(.55) saturate(.6); }
+.arena.paused::after {
+  content: 'PAUSED'; position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); z-index: 5;
+  font-family: var(--num); font-size: 14px; letter-spacing: 2px; color: var(--text);
+  background: #1a1423d9; border: 2px solid var(--edge-hi); border-radius: 4px; padding: 4px 10px;
+}
+.bs-head { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; }
+.bs-stage { position: relative; height: 104px; display: flex; align-items: flex-end; justify-content: center; border-radius: 6px; overflow: hidden; border: 2px solid var(--edge); }
+.bs-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.bs-info .nm { font-size: 20px; font-weight: 700; }
+.bs-info .meta { font-size: 13px; color: var(--muted); }
+.bs-stats { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.bs-stats b { color: var(--text); font-weight: 400; }
+.bs-slots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 12px; }
+.bs-slots .tile { width: 100%; height: auto; aspect-ratio: 1; border-width: 2px; }

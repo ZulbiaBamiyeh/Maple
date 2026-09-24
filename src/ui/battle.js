@@ -35,7 +35,7 @@ function glyphC(status) {
   return glyphCanvas.get(k);
 }
 
-export function showBattle(app, run, fight, onDone, { before = null, out = null, speed: startSpeed = 1, onSpeed } = {}) {
+export function showBattle(app, run, fight, onDone, { before = null, out = null, speed: startSpeed = 1, onSpeed, showFoe } = {}) {
   const { result, me, foe, duel, mobId } = fight;
   const biome = duel ? 'duel' : MOBS[mobId].family;
   const names = [me.name, foe.name];
@@ -50,8 +50,8 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
         <canvas id="arena-c"></canvas>
         ${[0, 1].map((i) => `
         <div class="ov ov${i}" id="fui${i}">
-          <div class="nmrow"><span class="nm">${names[i]}</span><span class="hpn" id="hpn${i}"></span></div>
-          <div class="bar hp" id="hp${i}"><div class="lag"></div><div class="fill"></div><div class="shield"></div></div>
+          <div class="nmrow"><span class="nm">${names[i]}</span>${i === 1 && duel && showFoe ? '<button class="peek" id="peek" aria-label="View their build">BUILD</button>' : ''}</div>
+          <div class="bar hp" id="hp${i}"><div class="lag"></div><div class="fill"></div><div class="shield"></div><div class="txt" id="hpn${i}"></div></div>
           <div class="bar timer" id="tm${i}"><div class="fill"></div></div>
           <div class="chips" id="chips${i}"></div>
         </div>`).join('')}
@@ -563,7 +563,8 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     why.className = 'why panel';
     why.innerHTML = whyHtml(result, names);
     logEl.replaceWith(why);
-    app.querySelector('#acts').innerHTML = `<button class="btn go" id="cont">Continue ▸</button>`;
+    app.querySelector('#acts').innerHTML = `${duel && showFoe ? '<button class="btn" id="peek2">Their build</button>' : ''}<button class="btn go" id="cont">Continue ▸</button>`;
+    app.querySelector('#peek2')?.addEventListener('click', () => showFoe(null));
     app.querySelector('#cont').onclick = () => { stop = true; onDone(); };
   }
 
@@ -574,10 +575,19 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   arena.append(call);
   setTimeout(() => call.remove(), 1100);
 
+  // Peeking at the rival's build pauses the fight until the sheet closes.
+  let paused = false;
+  app.querySelector('#peek')?.addEventListener('click', () => {
+    if (done) return showFoe(null);
+    paused = true;
+    arena.classList.add('paused');
+    showFoe(() => { paused = false; arena.classList.remove('paused'); });
+  });
+
   let stop = false;
   function loop(now) {
     if (stop || !document.body.contains(canvas)) return;
-    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+    const dt = paused ? 0 : Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     rt += dt;
     if (!done && rt > INTRO) {

@@ -409,7 +409,7 @@ export function itemSheet(ctx, inst, where) {
     ${setLine}
     ${cmp}
     ${scrollHtml}
-    ${acts.length ? `<div class="actions">${acts.join('')}</div>` : `<div class="actions"><button class="btn" data-act="close">Close</button></div>`}`;
+    ${acts.length ? `<div class="actions">${acts.join('')}</div>` : `<div class="actions">${where.back ? '<button class="btn" data-act="back">◂ Their build</button>' : ''}<button class="btn" data-act="close">Close</button></div>`}`;
 
   openSheet(html, (sheet) => {
     sheet.addEventListener('click', (ev) => {
@@ -423,8 +423,10 @@ export function itemSheet(ctx, inst, where) {
         itemSheet(ctx, inst, where);
         return;
       }
+      if (b.dataset.act === undefined) return;
       const act = b.dataset.act;
       if (act === 'close') return closeSheet();
+      if (act === 'back') return where.back();
       ctx.prevHead = run.headline();
       ctx.popHero = act === 'equip';
       if (where.from === 'loot') {
@@ -440,7 +442,38 @@ export function itemSheet(ctx, inst, where) {
       closeSheet();
       ctx.refresh();
     });
-  });
+  }, where.onClose);
+}
+
+// A rival's build, shown during a duel (the fight pauses) and after it.
+// Never before: duels are blind until the fight starts.
+export function buildSheet(ctx, onClose = null) {
+  const { run } = ctx;
+  const gh = run.ghost;
+  const gf = run.ghostFighter();
+  const hl = headline(gf);
+  const slots = ['weapon', 'hat', 'top', 'gloves', 'shoes', 'trinket1', 'trinket2'];
+  const html = `
+    <div class="bs-head">
+      <div class="bs-stage" data-stage="duel,0.9,3">${heroImg(gh.look, gh.equip, 2, { flip: true })}</div>
+      <div class="bs-info">
+        <div class="nm">${gh.name} <span class="chip trait">${gh.record}</span></div>
+        <div class="meta">${gh.archetype}${gh.mine ? ' · your past build' : ''}</div>
+        <div class="bs-stats num">
+          <span>DPS <b>${hl.dps}</b></span><span>EHP <b>${hl.ehp}</b></span>
+          <span>DEF <b>${gf.def}</b></span><span>RES <b>${fmtPct(gf.resist)}</b></span>
+        </div>
+      </div>
+    </div>
+    <div class="bs-slots">${slots.map((s) => tile(gh.equip[s], { size: 1.5, attrs: gh.equip[s] ? `data-bs="${s}"` : '', label: '' })).join('')}</div>
+    <div class="actions"><button class="btn" id="bs-close">${onClose ? 'Resume ▸' : 'Close'}</button></div>`;
+  openSheet(html, (sheet) => {
+    fitStages(sheet);
+    sheet.querySelector('#bs-close').onclick = closeSheet;
+    sheet.querySelectorAll('[data-bs]').forEach((el) => {
+      el.onclick = () => itemSheet(ctx, gh.equip[el.dataset.bs], { from: 'foe', back: () => buildSheet(ctx, onClose), onClose });
+    });
+  }, onClose);
 }
 
 // Pick an owned item to scroll.
