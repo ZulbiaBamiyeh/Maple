@@ -638,3 +638,26 @@ h2 { font-size: 20px; line-height: 1.1; }
 .donut { width: 80px; height: 80px; }
 .donut .mid b { font-size: 17px; }
 .dleg li { font-size: 12.5px; }
+
+/* ------------------------------------------------------------------ battle: status pops and chips */
+.popq { position: absolute; z-index: 2; display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+.popq0 { left: 8px; align-items: flex-start; } .popq1 { right: 8px; align-items: flex-end; }
+.spop {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 4px; border-radius: 5px;
+  background: #1a1423d9; border: 1px solid currentColor; font-size: 12px; font-weight: 900; white-space: nowrap;
+  animation: spop 1.3s ease-out forwards;
+}
+.spop span { color: var(--text); }
+@keyframes spop { 0% { opacity: 0; transform: translateY(-4px) scale(.9); } 10% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.chips { gap: 2px; }
+.st { padding: 0 3px 2px 1px; font-size: 11px; }
+
+/* folded days in the HUD */
+.day-pip {
+  display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 3px;
+  border: 2px solid var(--edge); background: var(--panel-2); color: var(--dim); font-size: 9.5px; font-weight: 900; line-height: 1;
+}
+.day-pip.done-w { background: #3d7f37; border-color: var(--green); color: #e6ffd8; }
+.day-pip.done-l { background: #8f2437; border-color: var(--red); color: #ffe0e4; }
+.day-pip.done-d { background: var(--edge); color: var(--text); }
+.pips { gap: 4px; }

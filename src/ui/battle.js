@@ -10,11 +10,10 @@ import { TPS } from '../sim.js';
 import { gridToCanvas, silhouette, squash } from '../art/pixel.js';
 import { heroGrid } from '../art/hero.js';
 import { mobGrid } from '../art/mobs.js';
-import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
 import { RAMPS } from '../art/palette.js';
 import { ITEMS, MOBS, STATUSES } from '../data.js';
-import { hud, equipIds, statusChip } from './common.js';
+import { hud, equipIds, statusChip, statusGlyph } from './common.js';
 
 const LEAD = 0.16; // real seconds from wind-up start to the strike
 const INTRO = 0.75; // real seconds before the first tick plays
@@ -35,12 +34,6 @@ const CLOSE = { dagger: 4, sword: 9, spear: 18, mace: 8, axe: 9, fist: 3, hop: 2
 const RANGED = new Set(['staff', 'cast']);
 
 
-const glyphCanvas = new Map();
-function glyphC(status) {
-  const k = STATUS_GLYPH[status] || 'star';
-  if (!glyphCanvas.has(k)) glyphCanvas.set(k, gridToCanvas(glyphGrid(k)));
-  return glyphCanvas.get(k);
-}
 
 export function showBattle(app, run, fight, onDone, { before = null, out = null, speed: startSpeed = 1, onSpeed, showFoe } = {}) {
   const { result, me, foe, duel, mobId } = fight;
@@ -63,6 +56,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
           <div class="chips" id="chips${i}"></div>
         </div>`).join('')}
         <div id="fx"></div>
+        <div class="popq popq0" id="popq0"></div><div class="popq popq1" id="popq1"></div>
       </div>
       <div class="log" id="log"></div>
       <div class="actions sticky" id="acts">
@@ -149,7 +143,10 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   const logEl = app.querySelector('#log');
   const fx = app.querySelector('#fx');
   const logLines = [];
-  const stackN = [0, 0];
+  // Damage numbers take whichever slot above the head has been free longest,
+  // so a burst of hits, ticks and procs fans out instead of piling up.
+  const LANES = [[0, 0], [-12, -5], [12, -5], [-6, -11], [6, -11]];
+  const laneUsed = [LANES.map(() => -9), LANES.map(() => -9)];
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const chestY = (f) => groundY - (f.bottom - f.chest);
@@ -161,15 +158,35 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     logEl.innerHTML = logLines.join('');
   }
 
+  // New statuses announce themselves in a small stack under that fighter's
+  // HP panel, away from the damage numbers over their head.
+  function statusPop(side, id, stacks) {
+    const meta = STATUSES[id];
+    if (!meta) return;
+    const q = app.querySelector(`#popq${side}`);
+    q.style.top = `${app.querySelector(`#fui${side}`).offsetHeight + 10}px`;
+    const el = document.createElement('div');
+    el.className = 'spop';
+    el.style.color = meta.color;
+    el.innerHTML = `${statusGlyph(id, 2)}<span>${meta.name}${stacks > 1 ? ` ×${stacks}` : ''}</span>`;
+    q.prepend(el);
+    while (q.children.length > 3) q.lastChild.remove();
+    setTimeout(() => el.remove(), 1300);
+  }
+
   function floatNum(side, text, cls, color) {
     const f = F[side];
-    const k = stackN[side]++ % 3;
+    const used = laneUsed[side];
+    let k = used.findIndex((u) => rt - u > 0.45);
+    if (k < 0) k = used.indexOf(Math.min(...used));
+    used[k] = rt;
+    const [lx, ly] = LANES[k];
     const el = document.createElement('div');
     el.className = `dmg ${cls}`;
     el.textContent = text;
     if (color) el.style.color = color;
-    el.style.left = `${((f.x + (k - 1) * 11) / W) * 100}%`;
-    el.style.top = `${(groundY - (f.bottom - f.headTop) - 2 - k * 7) * S}px`;
+    el.style.left = `${((f.x + lx) / W) * 100}%`;
+    el.style.top = `${(groundY - (f.bottom - f.headTop) - 2 + ly) * S}px`;
     fx.append(el);
     setTimeout(() => el.remove(), 1000);
   }
@@ -299,10 +316,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       if (e.source !== 'Regen' && e.source !== 'Lifesteal') log(`${e.source} heals ${names[e.dst]} <b class="c-heal">${e.amt}</b>`);
     } else if (e.type === 'status') {
       const meta = STATUSES[e.status];
-      if (visual) {
-        const d = F[e.dst];
-        effects.push({ type: 'pop', status: e.status, start: rt, x: d.x, y: groundY - (d.bottom - d.headTop) - 4 });
-      }
+      if (visual) statusPop(e.dst, e.status, e.stacks);
       const who = e.src === e.dst ? names[e.dst] : names[e.dst];
       log(`${who}: <span style="color:${meta.color}">${meta.name}${e.stacks > 1 ? ' ×' + e.stacks : ''}</span>`);
     } else if (e.type === 'dodge') {
@@ -504,13 +518,6 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
         ctx.fillStyle = e.color;
         ctx.globalAlpha = 1 - age / 0.4;
         for (let ang = 0; ang < Math.PI * 2; ang += 0.15) ctx.fillRect(Math.round(e.x + Math.cos(ang) * r), Math.round(e.y + Math.sin(ang) * r * 0.9), 1, 1);
-        ctx.globalAlpha = 1;
-      } else if (e.type === 'pop') {
-        if (age > 0.7) { effects.splice(k, 1); continue; }
-        const g = glyphC(e.status);
-        const rise = Math.min(1, age / 0.15);
-        ctx.globalAlpha = age > 0.5 ? 1 - (age - 0.5) / 0.2 : 1;
-        ctx.drawImage(g, Math.round(e.x - g.width / 2), Math.round(e.y - g.height - rise * 5));
         ctx.globalAlpha = 1;
       }
     }

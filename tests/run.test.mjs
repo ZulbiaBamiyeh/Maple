@@ -3,13 +3,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Run } from '../src/game.js';
-import { MOBS, BAG_SIZE, LIVES, ROUNDS } from '../src/data.js';
+import { MOBS, BAG_SIZE, LIVES, ROUNDS, DUEL_ROUNDS } from '../src/data.js';
 
 // A simple player: mostly easy hunts, equips drops that help, bags or leaves the rest.
 function play(run, step) {
   let guard = 0;
   while (!run.over && guard++ < 50) {
-    const tier = run.round % 3 === 1 ? 'normal' : 'easy';
+    const tier = (run.round - 1) % 4 === 0 ? 'normal' : 'easy';
     const mob = run.isDuel ? undefined : run.offers.find((m) => MOBS[m].tier === tier);
     run.fight(mob);
     run.resolve();
@@ -87,7 +87,7 @@ test('your saved build comes back as a duel ghost in later runs', async () => {
   let met = 0;
   for (let seed = 1; seed <= 40; seed++) {
     const b = new Run(seed);
-    b.round = 3;
+    b.round = DUEL_ROUNDS[0];
     b.rollRound();
     if (b.ghost.mine) {
       met++;

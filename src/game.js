@@ -1,4 +1,4 @@
-// The run: 9 rounds, 3 lives, hunts and duels. Holds all run state and the
+// The run: 5 days of three hunts and a duel, 3 lives. Holds all run state and the
 // actions the screens call. No DOM in here.
 
 import { Rng, hash } from './rng.js';
@@ -27,10 +27,9 @@ export function randomLook(rng) {
   };
 }
 
-// Hand-written rivals' gear rolls a few rounds behind the duel, more so later:
-// players only gear up from hunts, and a full rival kit at today's numbers is
-// too much.
-const ghostLag = (round) => 1 + dayOf(round);
+// Hand-written rivals' gear rolls at the duel's own numbers: with three hunts
+// a day, players arrive about as geared up as they are. (Saved player builds
+// keep their own rolls.)
 export const isDuel = (round) => DUEL_ROUNDS.includes(round);
 
 // Builds saved from earlier runs on this device, fought alongside the
@@ -116,7 +115,7 @@ export class Run {
       const gh = mine.length && r.chance(0.5) ? r.pick(mine) : r.pick(pool);
       this.ghost = {
         ...gh,
-        equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round, ghostLag(this.round)) : null])),
+        equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round, 0) : null])),
       };
       this.offers = null;
     } else {

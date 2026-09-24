@@ -6,7 +6,7 @@ import { iconGrid, ICON_SIZE } from '../art/icons.js';
 import { mobGrid, MOB_SIZE } from '../art/mobs.js';
 import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
-import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES, DAYS_IN_RUN, dayOf } from '../data.js';
+import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES, DAYS_IN_RUN, ROUNDS_PER_DAY, dayOf, slotOf } from '../data.js';
 import { tipSeen, markTip } from './store.js';
 import { registerTip } from './tooltip.js';
 
@@ -88,19 +88,26 @@ export function hud(run) {
   const hearts = [0, 1, 2].map((i) => `<span class="hrt ${lostNow && i === run.lives ? 'break' : ''}">${glyph(i < run.lives ? 'heart' : 'heartLost', 3)}</span>`).join('');
   const pips = [];
   const byRound = Object.fromEntries(run.history.map((h) => [h.round, h.result]));
-  // grouped by day: hunt, hunt, duel
+  // Today shows each round (three hunts, then the duel); other days fold into
+  // one numbered pip, coloured by how that day's duel went.
+  const today = dayOf(run.round);
   for (let d = 1; d <= DAYS_IN_RUN; d++) {
+    if (d !== today) {
+      const res = byRound[d * ROUNDS_PER_DAY];
+      pips.push(`<span class="day-pip ${res ? `done-${res.toLowerCase()}` : ''}">${d}</span>`);
+      continue;
+    }
     const g = [];
-    for (let r = d * 3 - 2; r <= d * 3; r++) {
+    for (let r = (d - 1) * ROUNDS_PER_DAY + 1; r <= d * ROUNDS_PER_DAY; r++) {
       const res = byRound[r];
       const cls = res ? `done-${res.toLowerCase()}` : r === run.round ? 'now' : '';
       g.push(`<span class="pip ${DUEL_ROUNDS.includes(r) ? 'duel' : ''} ${cls}"></span>`);
     }
-    pips.push(`<span class="day-pips ${d === dayOf(run.round) ? 'cur' : ''}">${g.join('')}</span>`);
+    pips.push(`<span class="day-pips cur">${g.join('')}</span>`);
   }
   return `<header class="hud">
     <div class="lives" aria-label="${run.lives} lives">${hearts}</div>
-    <div><div class="pips">${pips.join('')}</div><div class="round-label">DAY ${dayOf(run.round)}/${DAYS_IN_RUN} · ${run.isDuel ? 'DUEL' : `HUNT ${((run.round - 1) % 3) + 1}/2`}</div></div>
+    <div><div class="pips">${pips.join('')}</div><div class="round-label">DAY ${dayOf(run.round)}/${DAYS_IN_RUN} · ${run.isDuel ? 'DUEL' : `HUNT ${slotOf(run.round)}/${ROUNDS_PER_DAY - 1}`}</div></div>
     <div class="hud-r"><button class="menu-btn" data-menu aria-label="Menu"><i></i><i></i><i></i></button></div>
   </header>`;
 }

@@ -5,14 +5,19 @@ export const BASE = { hp: 120, atk: 0, def: 0, crit: 0.05, haste: 0, lifesteal: 
 export const RESIST_CAP = 0.5;
 export const BAG_SIZE = 6;
 export const LIVES = 3;
-// A run is 5 days. Each day is two hunts and then a duel against another
+// A run is 5 days. Each day is three hunts and then a duel against another
 // player's build; the monsters get tougher, and stranger, every day.
 export const DAYS_IN_RUN = 5;
-export const ROUNDS = DAYS_IN_RUN * 3;
-export const DUEL_ROUNDS = [3, 6, 9, 12, 15];
-export const dayOf = (round) => Math.ceil(round / 3);
+export const ROUNDS_PER_DAY = 4;
+export const ROUNDS = DAYS_IN_RUN * ROUNDS_PER_DAY;
+export const DUEL_ROUNDS = Array.from({ length: DAYS_IN_RUN }, (_, i) => (i + 1) * ROUNDS_PER_DAY);
+export const dayOf = (round) => Math.ceil(round / ROUNDS_PER_DAY);
+// 1-based position inside the day: 1..3 are hunts, 4 is the duel.
+export const slotOf = (round) => ((round - 1) % ROUNDS_PER_DAY) + 1;
 
-export const scaleFor = (round) => 1 + 0.12 * (round - 1);
+// Numbers grow +36% a day, spread evenly across the day's rounds, so each
+// day's duel sits at the same strength however many hunts come before it.
+export const scaleFor = (round) => 1 + 0.36 * (dayOf(round) - 1) + 0.08 * (slotOf(round) - 1);
 
 // ---------------------------------------------------------------- statuses
 
@@ -491,32 +496,32 @@ export const dayInfo = (round) => DAYS[Math.min(DAYS.length, dayOf(round)) - 1];
 // tools/tune.mjs so a careful player's build of that day wins about 85% of Easy
 // hunts, 62% of Normal hunts and 42% of Elite hunts. Missing means 1.
 export const MOB_POWER = {
-  stone_golem: 0.68,
-  cinder_imp: 1.09,
-  snapjaw_crab: 1.32,
-  sting_jelly: 1.15,
-  reef_eel: 1.22,
-  pearl_oyster: 1.21,
-  king_snapjaw: 0.89,
-  siren: 1.21,
-  cogling: 0.88,
-  rust_mite: 0.95,
-  arc_sprite: 1.36,
-  clockwork_knight: 1.11,
-  rust_titan: 0.94,
-  tesla_sentinel: 1.08,
-  grave_bat: 1.15,
-  bone_rattler: 1.01,
-  hex_crow: 1.69,
-  shade_stalker: 1.27,
-  bone_knight: 0.97,
-  moor_witch: 1.42,
-  emberling: 1.26,
-  gale_harpy: 1.08,
-  crystal_tortoise: 1.32,
-  thunder_roc: 1.62,
-  elder_drake: 1.17,
-  prism_colossus: 0.94,
+  stone_golem: 0.89,
+  cinder_imp: 1.19,
+  snapjaw_crab: 1.7,
+  sting_jelly: 1.55,
+  reef_eel: 1.43,
+  pearl_oyster: 1.4,
+  king_snapjaw: 1.04,
+  siren: 1.33,
+  cogling: 1.78,
+  rust_mite: 1.79,
+  arc_sprite: 1.81,
+  clockwork_knight: 1.54,
+  rust_titan: 1.26,
+  tesla_sentinel: 1.48,
+  grave_bat: 1.72,
+  bone_rattler: 1.5,
+  hex_crow: 2.06,
+  shade_stalker: 1.46,
+  bone_knight: 1.13,
+  moor_witch: 1.69,
+  emberling: 1.71,
+  gale_harpy: 1.43,
+  crystal_tortoise: 1.57,
+  thunder_roc: 1.58,
+  elder_drake: 1.1,
+  prism_colossus: 1.09,
 };
 DAYS.forEach((d, i) => {
   for (const ids of Object.values(d.tiers)) for (const id of ids) MOBS[id].day = i + 1;
@@ -617,72 +622,72 @@ export const AFFIXES = {
 const g = (item, rarity = 'common', affixes = [], perks = []) => ({ item, rarity, affixes, perks });
 
 export const GHOSTS = [
-  // day 1 (round 3): starter kit plus two drops
-  { id: 'mossbell', name: 'Mossbell', record: '2-0', round: 3, archetype: 'Poison dagger',
+  // day 1 (round 4): starter kit plus a few drops
+  { id: 'mossbell', name: 'Mossbell', record: '3-0', round: 4, archetype: 'Poison dagger',
     look: { gender: 'girl', hair: 'twintails', hairColor: 'mint', skin: 'light', eyes: 'green' },
     equip: { weapon: g('spore_shiv'), top: g('linen_shirt'), trinket1: g('viper_fang') } },
-  { id: 'brickley', name: 'Brickley', record: '1-1', round: 3, archetype: 'Tank',
+  { id: 'brickley', name: 'Brickley', record: '2-1', round: 4, archetype: 'Tank',
     look: { gender: 'boy', hair: 'crop', hairColor: 'chestnut', skin: 'tan', eyes: 'brown' },
     equip: { weapon: g('wooden_sword'), top: g('hide_vest'), hat: g('slime_cap') } },
-  { id: 'pip', name: 'Pip', record: '2-0', round: 3, archetype: 'Crit sword',
+  { id: 'pip', name: 'Pip', record: '3-0', round: 4, archetype: 'Crit sword',
     look: { gender: 'boy', hair: 'spiky', hairColor: 'blond', skin: 'light', eyes: 'blue' },
     equip: { weapon: g('jelly_sabre'), top: g('linen_shirt'), trinket1: g('lucky_clover') } },
 
-  // day 2 (round 6)
-  { id: 'ashvane', name: 'Ashvane', record: '4-1', round: 6, archetype: 'Burn staff',
+  // day 2 (round 8)
+  { id: 'ashvane', name: 'Ashvane', record: '6-1', round: 8, archetype: 'Burn staff',
     look: { gender: 'girl', hair: 'long', hairColor: 'crimson', skin: 'light', eyes: 'amber' },
     equip: { weapon: g('cinder_rod', 'rare', [{ stat: 'status', value: 0.05 }]), top: g('imp_robe'), shoes: g('cinder_boots'),
       hat: g('siren_veil'), trinket1: g('ember_charm') } },
-  { id: 'tuskra', name: 'Tuskra', record: '3-2', round: 6, archetype: 'Thorns tank',
+  { id: 'tuskra', name: 'Tuskra', record: '5-2', round: 8, archetype: 'Thorns tank',
     look: { gender: 'girl', hair: 'bob', hairColor: 'midnight', skin: 'deep', eyes: 'amber' },
     equip: { weapon: g('tusk_cleaver'), top: g('reef_mail'), gloves: g('tusk_gloves'),
       hat: g('shell_helm'), trinket1: g('thorn_ring') } },
-  { id: 'rimeheart', name: 'Rimeheart', record: '4-1', round: 6, archetype: 'Shock dagger',
+  { id: 'rimeheart', name: 'Rimeheart', record: '6-1', round: 8, archetype: 'Shock dagger',
     look: { gender: 'boy', hair: 'swept', hairColor: 'silver', skin: 'light', eyes: 'blue' },
     equip: { weapon: g('eelfang_dirk', 'rare', [{ stat: 'status', value: 0.05 }]), hat: g('wisp_hood'),
       shoes: g('current_boots'), top: g('hide_vest'), trinket1: g('static_charm') } },
 
-  // day 3 (round 9)
-  { id: 'old_granite', name: 'Old Granite', record: '6-2', round: 9, archetype: 'Mace tank',
+  // day 3 (round 12)
+  { id: 'old_granite', name: 'Old Granite', record: '9-2', round: 12, archetype: 'Mace tank',
     look: { gender: 'boy', hair: 'crop', hairColor: 'ash', skin: 'deep', eyes: 'brown' },
     equip: { weapon: g('boulder_maul', 'rare', [{ stat: 'hp', value: 15 }]), top: g('rust_plate'),
       hat: g('golem_helm', 'rare', [{ stat: 'resist', value: 0.1 }]), shoes: g('spring_boots'),
       trinket1: g('last_stand_locket'), trinket2: g('metronome') } },
-  { id: 'nightshade', name: 'Nightshade', record: '7-1', round: 9, archetype: 'Poison dagger',
+  { id: 'nightshade', name: 'Nightshade', record: '10-1', round: 12, archetype: 'Poison dagger',
     look: { gender: 'girl', hair: 'long', hairColor: 'lavender', skin: 'tan', eyes: 'violet' },
     equip: { weapon: g('spore_shiv', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'haste', value: 0.06 }], ['burst_poison']),
       hat: g('spore_hood'), shoes: g('current_boots'), top: g('reef_mail'),
       trinket1: g('viper_fang'), trinket2: g('plague_censer', 'rare') } },
-  { id: 'solenne', name: 'Solenne', record: '6-2', round: 9, archetype: 'Shock staff',
+  { id: 'solenne', name: 'Solenne', record: '9-2', round: 12, archetype: 'Shock staff',
     look: { gender: 'girl', hair: 'ponytail', hairColor: 'blond', skin: 'light', eyes: 'blue' },
     equip: { weapon: g('arc_rod', 'rare', [{ stat: 'crit', value: 0.05 }], ['vs_shock']),
       gloves: g('dynamo_gloves'), top: g('nacre_robe'), hat: g('coil_helm'),
       trinket1: g('leyden_jar'), trinket2: g('static_charm') } },
 
-  // day 4 (round 12)
-  { id: 'vesper', name: 'Vesper', record: '9-2', round: 12, archetype: 'Evasion riposte',
+  // day 4 (round 16)
+  { id: 'vesper', name: 'Vesper', record: '13-2', round: 16, archetype: 'Evasion riposte',
     look: { gender: 'girl', hair: 'bob', hairColor: 'raven', skin: 'fair', eyes: 'violet' },
     equip: { weapon: g('nightfang', 'rare', [{ stat: 'haste', value: 0.06 }], ['riposte']), top: g('shadow_cloak'), shoes: g('whisper_boots'),
       hat: g('siren_veil'), gloves: g('tusk_gloves'), trinket1: g('mirror_shard'), trinket2: g('knucklebones') } },
-  { id: 'grimm', name: 'Grimm', record: '8-3', round: 12, archetype: 'Crit bruiser',
+  { id: 'grimm', name: 'Grimm', record: '12-3', round: 16, archetype: 'Crit bruiser',
     look: { gender: 'boy', hair: 'messy', hairColor: 'ash', skin: 'tan', eyes: 'amber' },
     equip: { weapon: g('bonecarver', 'epic', [{ stat: 'crit', value: 0.05 }, { stat: 'atk', value: 2 }], ['execute']), hat: g('skull_helm'),
       top: g('ribcage_plate'), gloves: g('dynamo_gloves'), shoes: g('spring_boots'), trinket1: g('knucklebones'), trinket2: g('lucky_clover') } },
-  { id: 'morwen', name: 'Morwen', record: '9-2', round: 12, archetype: 'Hex and poison',
+  { id: 'morwen', name: 'Morwen', record: '13-2', round: 16, archetype: 'Hex and poison',
     look: { gender: 'girl', hair: 'long', hairColor: 'midnight', skin: 'light', eyes: 'green' },
     equip: { weapon: g('blightwood_staff', 'rare', [{ stat: 'status', value: 0.05 }], ['vs_hex']), hat: g('witch_hat'), top: g('nacre_robe'),
       shoes: g('spore_boots'), gloves: g('gel_gloves'), trinket1: g('cursed_doll'), trinket2: g('gilded_hourglass', 'rare') } },
 
-  // day 5 (round 15): the final duel
-  { id: 'ignis', name: 'Ignis', record: '12-2', round: 15, archetype: 'Dragonblood burn',
+  // day 5 (round 20): the final duel
+  { id: 'ignis', name: 'Ignis', record: '17-2', round: 20, archetype: 'Dragonblood burn',
     look: { gender: 'boy', hair: 'spiky', hairColor: 'crimson', skin: 'tan', eyes: 'amber' },
     equip: { weapon: g('emberbrand', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'atk', value: 2 }], ['burst_burn']), hat: g('drake_helm'),
       top: g('scale_mail'), gloves: g('storm_gauntlets'), shoes: g('cinder_boots'), trinket1: g('wyrm_heart'), trinket2: g('phoenix_feather', 'rare') } },
-  { id: 'zephyra', name: 'Zephyra', record: '11-3', round: 15, archetype: 'Storm shock',
+  { id: 'zephyra', name: 'Zephyra', record: '16-3', round: 20, archetype: 'Storm shock',
     look: { gender: 'girl', hair: 'ponytail', hairColor: 'silver', skin: 'deep', eyes: 'blue' },
     equip: { weapon: g('stormpiercer', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'haste', value: 0.06 }], ['shock_on_crit']), hat: g('coil_helm'),
       top: g('reef_mail'), shoes: g('gale_boots'), gloves: g('tidecaller_gloves'), trinket1: g('bottled_storm', 'rare'), trinket2: g('thunderhead_totem') } },
-  { id: 'quartzia', name: 'Quartzia', record: '12-2', round: 15, archetype: 'Crystal fortress',
+  { id: 'quartzia', name: 'Quartzia', record: '17-2', round: 20, archetype: 'Crystal fortress',
     look: { gender: 'girl', hair: 'twintails', hairColor: 'lavender', skin: 'fair', eyes: 'pink' },
     equip: { weapon: g('prism_lance', 'rare', [{ stat: 'hp', value: 15 }], ['opener_shield']), hat: g('crystal_crown'), top: g('geode_plate'),
       shoes: g('spring_boots'), gloves: g('oil_gauntlets'), trinket1: g('refraction_gem'), trinket2: g('last_stand_locket') } },

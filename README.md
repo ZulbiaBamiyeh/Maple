@@ -29,10 +29,10 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 
 | | |
 |---|---|
-| **The run** | 5 days and 3 lives. Each day is two hunts and then a duel (15 rounds). Only a lost duel costs a life. Win the day-5 duel for a Crown. |
-| **Days** | Mossy Meadow, Tidal Shore, Clockwork Ruins, Haunted Moor and Dragon Peak. Each day has its own 6 monsters (2 Easy, 2 Normal, 2 Elite), its own backdrop, and a title card when it starts. The HUD groups the 15 round pips by day. Later days roll fewer commons. |
+| **The run** | 5 days and 3 lives. Each day is three hunts and then a duel (20 rounds). Only a lost duel costs a life. Win the day-5 duel for a Crown. |
+| **Days** | Mossy Meadow, Tidal Shore, Clockwork Ruins, Haunted Moor and Dragon Peak. Each day has its own 6 monsters (2 Easy, 2 Normal, 2 Elite), its own backdrop, and a title card when it starts. The HUD shows today's four rounds as pips and folds every other day into one numbered pip, coloured by that day's duel result. Later days roll fewer commons. |
 | **Hunts** | One Easy, one Normal and one Elite mob to choose from each round. Each card shows HP, hit, trait, drop table and rarity odds. After a win you pick 1 of 3 random drops from its table. A loss just means no drop: hunts are for loot, and lives are lost only in duels. Easy monsters are a safety net: they are tuned so even a weak build wins about 80% of the time, but their drops stay mostly Common every day. The Rare and Epic gear (perks, relics) comes from Normal and Elite. |
-| **Duels** | Blind before the fight, as in The Bazaar: the rival is a silhouette with a name and record. Once the fight starts, tap **BUILD** on their HP panel to pause and inspect their gear. After the fight, **Their build** sits next to Continue. A win adds to your record and gives no items, since gear only comes from hunts. The 15 hand-written ghosts are 3 per duel round, and some of the later ones carry relics. Hand-written rivals' gear rolls a few rounds behind the duel (1 + the day number), because players only gear up from hunts. |
+| **Duels** | Blind before the fight, as in The Bazaar: the rival is a silhouette with a name and record. Once the fight starts, tap **BUILD** on their HP panel to pause and inspect their gear. After the fight, **Their build** sits next to Continue. A win adds to your record and gives no items, since gear only comes from hunts. The 15 hand-written ghosts are 3 per duel round, and some of the later ones carry relics. Hand-written rivals' gear rolls at the duel's own numbers. Monster and gear numbers grow per day (+36%), spread across the day's rounds, so every duel sits at the same strength however many hunts come before it. |
 | **Combat** | `simulate(a, b, seed)` in [src/sim.js](src/sim.js) is a pure function on fixed 50 ms ticks with seeded mulberry32. It covers all 6 weapon types and 13 statuses (including Shock, Hex and the relics' Gilded), evasion, crit damage, armour pierce, thorns, conditional damage (vs a status, execute, rage), detonations, every trigger, overtime and draws. The battle screen only replays its frames and events at 1×, 2× or Skip. |
 | **Battle feel** | Fighters slide in under a FIGHT! callout. Each attack winds up, dashes in and strikes on the exact tick its damage lands. Every weapon and monster attacks its own way: sword and axe arcs, spear thrusts, magic bolts, slime hops, boar charges and golem slams. Hits bring flashes, knockback, sparks, screen shake on crits, popping damage numbers and status icons. A KO bursts the loser into pixels while the winner hops. The HP bars sit inside the arena. |
 | **Odds** | Hunt cards show your chances against each monster with your current gear, in five bands from Deadly to Easy win. They come from practice fights on seeds the real fight never uses. Duels show no odds and no gear, so you can't solve a rival before fighting them. |
@@ -44,6 +44,7 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 | **Text** | Pixel fonts are kept for titles, names and battle pop-ups. Everything you read (stats, item lines, the log) uses Nunito at 12–15 px. |
 | **Animation** | Idle is a two-frame pixel breath: a hero's upper body sinks 1 px with the feet planted, and monsters squash 1 px. The whole sprite never bobs. |
 | **Help** | A short popup the first time each screen appears, and no permanent tutorial text. The ≡ menu has How to play (every stat and status explained), Show intro popups again, and Abandon run. |
+| **Battle clarity** | New statuses pop up in a small stack under that fighter's HP panel, well away from the damage numbers. Damage numbers take whichever of five slots above the head has been free longest, so bursts fan out instead of piling up. |
 | **Readability** | Status chips have stack counts and draining timers. Damage numbers are colour-coded, and an attack-timer bar sits under each HP bar. After every fight a donut chart breaks down your damage by type (hits, crits, shock, burn, poison, bleed, thorns, overclock), with a Dealt / Taken toggle. Tap or hover a slice or legend row to read it out in the middle. Colours are fixed per type and ordered so neighbouring slices stay distinct for colour-blind players, and every slice is also named in the legend. |
 | **Builds** | 12 new monster families each bring a set and a status or mechanic: Reefguard thorns, Stormscale shock, Pearlescent shields, Mainspring speed, Corrosion armour-break, Overcharge, Ossuary crits, Witchmark hex, Umbral evasion, Dragonblood, Tempest and Prism. |
 | **Perks** | Rare items have a 40% chance of a ✦ perk, and epics always have one plus a 25% chance of a second. Perks are niche payoffs such as +dmg vs Poisoned, a poison burst every 4th hit, shock on crit, execute, rage, an opening shield or a riposte on dodge. They lean towards the item's own status. |
@@ -89,9 +90,9 @@ Bot results over 150 runs of the 5-day run:
 
 | Strategy | Crown rate |
 |---|---|
-| Careful player (the hardest tier it usually beats) | ~39% |
-| Always Easy (safe, but mostly Common gear) | ~25% |
-| Always Normal | ~6% |
+| Careful player (the hardest tier it usually beats) | ~43% |
+| Always Easy (safe, but mostly Common gear) | ~32% |
+| Always Normal | ~8% |
 | Always Elite | ~0% |
 
-Duel win rates for careful play land between 45% and 85%, with the final duel near 45%. The bots score gear only by DPS × EHP, so they undervalue perks and relics. A player who builds around them does better.
+Duel win rates for careful play land between 47% and 95% (the first duel is gentle), with the final duel near 50%. The bots score gear only by DPS × EHP, so they undervalue perks and relics. A player who builds around them does better.
