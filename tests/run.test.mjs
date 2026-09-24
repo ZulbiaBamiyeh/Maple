@@ -114,3 +114,39 @@ test('your saved build comes back as a duel ghost in later runs', async () => {
   savedGhosts.length = 0;
   assert.ok(met > 5 && met < 35, `met own ghost ${met}/40 times`);
 });
+
+test('a shop opens before every duel, stocked only with shop items', async () => {
+  const { ITEMS, DUEL_ROUNDS, SHOP_SIZE } = await import('../src/data.js');
+  for (let seed = 1; seed <= 20; seed++) {
+    const run = new Run(seed);
+    assert.equal(run.shop, null);
+    for (const r of DUEL_ROUNDS) {
+      run.round = r;
+      run.rollRound();
+      assert.equal(run.shop.length, SHOP_SIZE);
+      assert.equal(new Set(run.shop.map((w) => w.inst.item)).size, SHOP_SIZE, 'duplicate wares');
+      for (const w of run.shop) assert.ok(ITEMS[w.inst.item].shop, `${w.inst.item} is not a shop item`);
+    }
+    for (const m of Object.values(MOBS)) for (const d of m.drops) assert.ok(!ITEMS[d].shop, `${d} drops from a mob`);
+  }
+});
+
+test('buying costs gold, needs enough of it, and handles a full bag', () => {
+  const run = new Run(8);
+  run.round = 3;
+  run.rollRound();
+  run.gold = 0;
+  assert.equal(run.buy(0, 'bag'), false);
+  run.gold = 100;
+  const price = run.shop[0].price;
+  assert.equal(run.buy(0, 'bag'), true);
+  assert.equal(run.gold, 100 - price);
+  assert.equal(run.buy(0, 'bag'), false, 'bought the same ware twice');
+  while (!run.bagFull()) run.bag.push({ ...run.bag[0], uid: 'x' + run.bag.length });
+  assert.equal(run.buy(1, 'bag'), false, 'bought into a full bag');
+  const w = run.shop[1];
+  assert.equal(run.buy(1, 'equip'), true);
+  assert.equal(run.equip[run.slotFor(w.inst)]?.uid ?? Object.values(run.equip).find((x) => x?.uid === w.inst.uid)?.uid, w.inst.uid);
+  const json = JSON.parse(JSON.stringify(run));
+  assert.equal(Run.fromJSON(json).shop[1].sold, true);
+});

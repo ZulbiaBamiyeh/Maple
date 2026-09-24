@@ -4,7 +4,7 @@
 import { Run, randomLook, savedGhosts } from './game.js';
 import { Rng } from './rng.js';
 import { showBattle } from './ui/battle.js';
-import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
+import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, shopScreen, menuSheet, buildSheet } from './ui/screens.js';
 import { toast, closeSheet } from './ui/common.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
@@ -34,7 +34,7 @@ function keepGhost(run) {
 }
 
 // Screens that are safe to resume on. A battle resumes on whatever comes after it.
-const RESUMABLE = new Set(['pick', 'gear', 'loot', 'end']);
+const RESUMABLE = new Set(['pick', 'gear', 'loot', 'shop', 'end']);
 
 function readSave() {
   const data = load('run');
@@ -106,10 +106,12 @@ const ctx = {
     if (ctx.run.over) return finishRun();
     ctx.go('gear', { mode: 'hub' });
   },
+  // A duel round opens with the shop, then the duel preview.
   nextRound() {
     ctx.run.next();
-    ctx.go(ctx.run.isDuel ? 'gear' : 'pick', ctx.run.isDuel ? { mode: 'duel' } : {});
+    ctx.go(ctx.run.isDuel ? 'shop' : 'pick');
   },
+  leaveShop() { ctx.go('gear', { mode: 'duel' }); },
   openMenu() { menuSheet(ctx); },
 };
 
@@ -172,6 +174,7 @@ function render() {
     case 'pick': return pickScreen(app, ctx);
     case 'gear': return gearScreen(app, ctx, ctx.opts);
     case 'loot': return lootScreen(app, ctx);
+    case 'shop': return shopScreen(app, ctx);
     case 'end': return endScreen(app, ctx);
     case 'battle': return showBattle(app, ctx.run, ctx.opts.fight, afterBattle, {
       before: ctx.opts.before, out: ctx.opts.out, speed: ctx.speed,

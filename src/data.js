@@ -131,6 +131,30 @@ export const ITEMS = {
     trigger: { type: 'onCrit' }, effect: { apply: 'sunder' }, desc: 'On crit: Sunder.' },
   vampire_tooth: { name: 'Vampire Tooth', slot: 'trinket', family: null, icon: 't_tooth',
     stats: { lifesteal: 0.06 }, desc: '+6% Lifesteal.' },
+
+  // ---- shop stock: sold before each duel, never dropped by monsters
+  iron_sword: { name: 'Iron Sword', slot: 'weapon', type: 'sword', family: null, shop: true, min: 11, max: 16,
+    icon: 'sword', ramp: 'steel', flavor: 'Plain, sharp, dependable.' },
+  twin_fang: { name: 'Twin Fang', slot: 'weapon', type: 'dagger', family: null, shop: true,
+    icon: 'dagger', ramp: 'bone', stats: { crit: 0.05 }, flavor: 'Two edges, no manners.' },
+  oak_staff: { name: 'Oak Staff', slot: 'weapon', type: 'staff', family: null, shop: true, min: 9, max: 13,
+    icon: 'staff', ramp: 'gold', flavor: 'The orb hums when it is happy.' },
+  leather_cap: { name: 'Leather Cap', slot: 'hat', family: null, shop: true, stats: { hp: 14, def: 1, resist: 0.05 },
+    icon: 'hat_helm', look: { shape: 'helm', ramp: 'leather', trim: 'bone' }, flavor: 'Smells of the road.' },
+  chain_mail: { name: 'Chain Mail', slot: 'top', family: null, shop: true, stats: { hp: 26, def: 3 },
+    icon: 'top_plate', look: { shape: 'tunic', ramp: 'steel', trim: 'leather' }, flavor: 'Rings like rain when you run.' },
+  brawler_wraps: { name: 'Brawler Wraps', slot: 'gloves', family: null, shop: true, stats: { atk: 3 },
+    icon: 'gloves', look: { ramp: 'linen', trim: 'leather' }, flavor: 'Knuckles first.' },
+  swift_boots: { name: 'Swift Boots', slot: 'shoes', family: null, shop: true, stats: { haste: 0.1 },
+    icon: 'boots', look: { ramp: 'frost', trim: 'gold' }, flavor: 'Barely touch the ground.' },
+  guard_charm: { name: 'Guard Charm', slot: 'trinket', family: null, shop: true, icon: 't_guard',
+    trigger: { type: 'battleStart' }, effect: { shield: 20, target: 'self' }, desc: 'Battle start: 20 Shield.' },
+  berserker_band: { name: 'Berserker Band', slot: 'trinket', family: null, shop: true, icon: 't_band',
+    trigger: { type: 'hpBelow', pct: 0.5 }, effect: { apply: 'frenzy', duration: 6, target: 'self' }, desc: 'Below 50% HP, once: Frenzy 6s.' },
+  iron_heart: { name: 'Iron Heart', slot: 'trinket', family: null, shop: true, icon: 't_heart',
+    stats: { hp: 25 }, desc: 'A second, sturdier heartbeat.' },
+  mending_pendant: { name: 'Mending Pendant', slot: 'trinket', family: null, shop: true, icon: 't_pendant',
+    trigger: { type: 'everySeconds', s: 4 }, effect: { heal: 6 }, desc: 'Every 4s: heal 6.' },
 };
 for (const [id, it] of Object.entries(ITEMS)) it.id = id;
 
@@ -206,6 +230,12 @@ export const SCROLLS = {
   longshot: { name: 'Long-shot Scroll', chance: 0.1, bonus: 8, cost: 4, glow: true },
 };
 export const UPGRADE_SLOTS = 3;
+
+// The shop opens before every duel round. Four wares from its own stock,
+// with rarity odds that improve as the run goes on.
+export const SHOP_SIZE = 4;
+export const SHOP_PRICE = { common: 4, rare: 7, epic: 11 };
+export const shopTier = (round) => (round <= 3 ? 'easy' : round <= 6 ? 'normal' : 'elite');
 
 // ---------------------------------------------------------------- ghosts
 // Hand-written opponents, three per duel round. Each is a saved build as the

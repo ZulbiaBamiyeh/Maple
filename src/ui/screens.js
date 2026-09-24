@@ -7,7 +7,7 @@
 
 import {
   ITEMS, MOBS, FAMILIES, RARITIES, RARITY_ODDS, SCROLLS, MAIN_STAT, UPGRADE_SLOTS, BAG_SIZE,
-  slotKind, scaleFor, STATUSES,
+  slotKind, scaleFor, STATUSES, SLOTS,
 } from '../data.js';
 import { statLines, scrapValue, setCounts, activeSets, headline } from '../items.js';
 import { drawScene } from '../art/scenes.js';
@@ -72,7 +72,11 @@ const INTRO = {
     <p><b>Equip</b> it, stash it in your <b>bag</b> for later duels, or <b>scrap</b> it for gold.</p>`],
   hub: ['Your gear', `
     <p><b>DPS</b> is your damage per second. <b>EHP</b> is how much you can take, counting Def.</p>
-    <p>Tap any item to swap it, scrap it, or spend gold on <b>scrolls</b> to upgrade it. Two pieces from one monster family unlock a set bonus.</p>`],
+    <p>Tap any item to swap or scrap it. Two pieces from one monster family unlock a set bonus.</p>
+    <p>Save your gold: a <b>shop</b> opens before every duel.</p>`],
+  shop: ['The shop', `
+    <p>A merchant sets up before every duel. Their gear never drops from monsters.</p>
+    <p><b>Scrolls</b> upgrade what you already own. Each item has 3 upgrade slots, used whether the scroll works or not.</p>`],
   duelBlind: ['Duel!', `
     <p>You face another player's saved build. You won't see it until the fight starts.</p>
     <p>Go in with your strongest all-round gear. Win and you loot from their build; lose and you'll know what beat you.</p>`],
@@ -149,14 +153,12 @@ export function pickScreen(app, ctx) {
       <div class="actions">
         <button class="btn small" id="gear">Gear</button>
         <button class="btn small" id="bag">Bag ${run.bag.length}/${BAG_SIZE}</button>
-        <button class="btn small" id="scrolls">Scrolls</button>
       </div>
     </section>`;
   fitStages(app);
   app.querySelectorAll('[data-mob]').forEach((el) => { el.onclick = () => ctx.hunt(el.dataset.mob); });
   app.querySelector('#gear').onclick = () => ctx.go('gear', { mode: 'view' });
   app.querySelector('#bag').onclick = () => ctx.go('gear', { mode: 'view' });
-  app.querySelector('#scrolls').onclick = () => scrollPicker(ctx);
   // Odds take a few practice fights each; fill them in after the first paint.
   later(() => app.querySelectorAll('[data-odds]').forEach((el) => {
     el.innerHTML = oddsChip(run.mobOdds(el.dataset.odds));
@@ -332,7 +334,6 @@ export function itemSheet(ctx, inst, where) {
   const { run } = ctx;
   const it = ITEMS[inst.item];
   const kind = slotKind(it.slot);
-  const owned = where.from === 'bag' || where.from === 'equip';
   const fam = it.family ? FAMILIES[it.family] : null;
   const counts = setCounts(run.equip);
   const before = run.headline();
@@ -340,7 +341,7 @@ export function itemSheet(ctx, inst, where) {
   // what the build looks like with/without this item
   let cmp = '';
   let targetSlots = [];
-  if (where.from === 'loot' || where.from === 'bag' || where.from === 'foe') {
+  if (where.from === 'loot' || where.from === 'bag' || where.from === 'foe' || where.from === 'shop') {
     if (kind === 'trinket' && run.equip.trinket1 && run.equip.trinket2) targetSlots = ['trinket1', 'trinket2'];
     else targetSlots = [run.slotFor(inst)];
     const after = run.headline(run.withItem(inst, targetSlots[0]));
@@ -383,17 +384,16 @@ export function itemSheet(ctx, inst, where) {
   } else if (where.from === 'equip') {
     acts.push(`<button class="btn" data-act="unequip" ${run.bagFull() ? 'disabled' : ''}>${run.bagFull() ? 'Bag full' : 'Unequip'}</button>`);
     acts.push(`<button class="btn danger" data-act="scrap">Scrap +${sv}g</button>`);
-  }
-
-  let scrollHtml = '';
-  if (owned) {
-    const ms = MAIN_STAT[kind];
-    const left = UPGRADE_SLOTS - inst.upgrades.used;
-    const amt = (b) => (ms.stat === 'haste' ? `${Math.round(b * ms.per * 100)}%` : b * ms.per);
-    scrollHtml = `<div class="scrolls">${Object.entries(SCROLLS).map(([id, s]) => `
-        <button class="btn small" data-scroll="${id}" ${left <= 0 || run.gold < s.cost ? 'disabled' : ''}>
-          ${s.name.replace(' Scroll', '')}<small>${Math.round(s.chance * 100)}% · +${amt(s.bonus)} ${ms.label} · ${s.cost}g</small>
-        </button>`).join('')}</div>`;
+  } else if (where.from === 'shop') {
+    const ware = run.shop[where.ware];
+    const broke = run.gold < ware.price;
+    for (const s of targetSlots) {
+      const old = run.equip[s];
+      const label = targetSlots.length > 1 ? `Replace ${itemName(old)}` : 'Buy & equip';
+      acts.push(`<button class="btn go" data-act="buy-equip" data-to="${s}" ${broke ? 'disabled' : ''}>${label}</button>`);
+    }
+    acts.push(`<button class="btn" data-act="buy-bag" ${broke || run.bagFull() ? 'disabled' : ''}>Buy to bag</button>`);
+    cmp += `<div class="pricetag"><span>Price ${glyph('coin', 2)} <b>${ware.price}</b></span><span class="${broke ? 'down-bad' : ''}">You have ${glyph('coin', 2)} ${run.gold}</span></div>`;
   }
 
   const html = `
@@ -408,27 +408,26 @@ export function itemSheet(ctx, inst, where) {
     <div class="statlist">${statLines(inst).map((l) => `<span>${l}</span>`).join('')}</div>
     ${setLine}
     ${cmp}
-    ${scrollHtml}
     ${acts.length ? `<div class="actions">${acts.join('')}</div>` : `<div class="actions">${where.back ? '<button class="btn" data-act="back">◂ Their build</button>' : ''}<button class="btn" data-act="close">Close</button></div>`}`;
 
   openSheet(html, (sheet) => {
     sheet.addEventListener('click', (ev) => {
       const b = ev.target.closest('button');
       if (!b) return;
-      if (b.dataset.scroll) {
-        const ok = run.scroll(inst.uid, b.dataset.scroll);
-        if (ok === null) return;
-        toast(ok ? `Scroll succeeded! ${itemName(inst)} +${inst.upgrades.bonus}` : 'The scroll fizzled… slot used.', ok ? 'good' : 'bad');
-        ctx.refresh();
-        itemSheet(ctx, inst, where);
-        return;
-      }
       if (b.dataset.act === undefined) return;
       const act = b.dataset.act;
       if (act === 'close') return closeSheet();
       if (act === 'back') return where.back();
       ctx.prevHead = run.headline();
       ctx.popHero = act === 'equip';
+      if (where.from === 'shop') {
+        if (run.buy(where.ware, act === 'buy-bag' ? 'bag' : 'equip', b.dataset.to)) {
+          toast(`Bought ${itemName(inst)}`, 'gold');
+        }
+        closeSheet();
+        ctx.refresh();
+        return;
+      }
       if (where.from === 'loot') {
         if (act === 'scrap') toast(`+${sv} gold`, 'gold');
         run.takeLoot(inst, act, b.dataset.to);
@@ -476,20 +475,103 @@ export function buildSheet(ctx, onClose = null) {
   }, onClose);
 }
 
-// Pick an owned item to scroll.
-function scrollPicker(ctx) {
+// Scrolls are only sold (and used) at the shop: pick one, then tap items to
+// read it onto them, one slot each, while your gold lasts.
+function scrollSheet(ctx, scrollId) {
   const { run } = ctx;
-  const owned = [...Object.entries(run.equip).filter(([, v]) => v).map(([s, v]) => ({ inst: v, where: { from: 'equip', slot: s } })),
-    ...run.bag.map((v) => ({ inst: v, where: { from: 'bag' } }))];
+  const sc = SCROLLS[scrollId];
+  const owned = [...SLOTS.map((s) => run.equip[s]).filter(Boolean), ...run.bag];
+  const cells = owned.map((inst, i) => {
+    const left = UPGRADE_SLOTS - inst.upgrades.used;
+    const ms = MAIN_STAT[slotKind(ITEMS[inst.item].slot)];
+    return `<div class="sc-cell ${left <= 0 ? 'full' : ''}" data-i="${i}">
+      ${tile(inst, { size: 2 })}
+      <span class="sc-left">${left > 0 ? `${left} left` : 'full'}</span>
+      <span class="sc-stat">${ms.label}</span>
+    </div>`;
+  }).join('');
+  const amt = sc.bonus;
   const html = `
-    <h2>Scrolls <span class="num" style="font-size:14px;color:var(--gold)">${run.gold}g</span></h2>
-    <div class="sub" style="margin:4px 0 10px">Pick an item to upgrade. Each has 3 slots.</div>
-    <div class="bag">${owned.map((o, i) => tile(o.inst, { size: 2, attrs: `data-i="${i}"` })).join('')}</div>`;
+    <div class="sc-head">
+      <h2>${sc.name}</h2>
+      <span class="gold num">${glyph('coin', 2)} ${run.gold}</span>
+    </div>
+    <div class="sub">${Math.round(sc.chance * 100)}% chance of +${amt} to the item's main stat${sc.glow ? ', and it glows' : ''}. Costs ${sc.cost}g and uses one of its 3 slots either way.</div>
+    <div class="sc-grid">${cells || '<div class="sub">Nothing to upgrade.</div>'}</div>
+    <div class="actions"><button class="btn" id="sc-done">Done</button></div>`;
   openSheet(html, (sheet) => {
+    sheet.querySelector('#sc-done').onclick = closeSheet;
     sheet.querySelectorAll('[data-i]').forEach((el) => {
-      el.onclick = () => { const o = owned[+el.dataset.i]; itemSheet(ctx, o.inst, o.where); };
+      el.onclick = () => {
+        const inst = owned[+el.dataset.i];
+        if (run.gold < sc.cost) { toast(`Need ${sc.cost - run.gold} more gold`, 'bad'); return; }
+        const ok = run.scroll(inst.uid, scrollId);
+        if (ok === null) return;
+        toast(ok ? `Success! ${itemName(inst)} +${inst.upgrades.bonus}` : 'The scroll fizzled… slot used.', ok ? 'good' : 'bad');
+        ctx.refresh();
+        scrollSheet(ctx, scrollId);
+        const cell = document.querySelector(`#sheet-root [data-i="${el.dataset.i}"]`);
+        cell?.classList.add(ok ? 'sc-ok' : 'sc-fail');
+      };
     });
   });
+}
+
+// ---------------------------------------------------------------- shop
+
+const MERCHANT = {
+  look: { gender: 'boy', hair: 'messy', hairColor: 'ash', skin: 'tan', eyes: 'amber', name: 'Moss' },
+  equip: { hat: { item: 'leather_cap' }, top: { item: 'chain_mail' }, weapon: { item: 'oak_staff' } },
+};
+
+export function shopScreen(app, ctx) {
+  const { run } = ctx;
+  const before = run.headline();
+  const wares = run.shop.map((w, i) => {
+    const it = ITEMS[w.inst.item];
+    const after = run.headline(run.withItem(w.inst));
+    const up = after.dps > before.dps + 0.05 ? '▲ DPS' : after.ehp > before.ehp ? '▲ EHP' : '';
+    return `
+    <div class="ware panel ${w.sold ? 'sold' : ''} ${!w.sold && run.gold < w.price ? 'dear' : ''}" ${w.sold ? '' : `data-ware="${i}"`}>
+      ${tile(w.inst, { size: 2 })}
+      <div class="ware-body">
+        <div class="nm rc-${w.inst.rarity}">${it.name}</div>
+        <div class="meta">${RARITIES[w.inst.rarity].name} ${slotName(w.inst)}</div>
+        ${up && !w.sold ? `<span class="tag up">${up}</span>` : ''}
+      </div>
+      <div class="price num">${w.sold ? 'SOLD' : `${glyph('coin', 2)}${w.price}`}</div>
+    </div>`;
+  }).join('');
+  const scrolls = Object.entries(SCROLLS).map(([id, sc]) => `
+    <button class="btn scrollbtn" data-scroll="${id}" ${run.gold < sc.cost ? 'disabled' : ''}>
+      <span class="sn">${sc.name.replace(' Scroll', '')}</span>
+      <small>${Math.round(sc.chance * 100)}% · +${sc.bonus}</small>
+      <span class="sp num">${glyph('coin', 1)}${sc.cost}</span>
+    </button>`).join('');
+  app.innerHTML = `
+    ${hud(run)}
+    <section class="screen shop">
+      <div class="shop-head panel">
+        <div class="merchant" data-stage="boar,0.9,3">${heroImg(MERCHANT.look, MERCHANT.equip, 3, { flip: true })}</div>
+        <div class="shop-title">
+          <div class="kicker">WANDERING MERCHANT</div>
+          <h2>Moss's Wares</h2>
+          <div class="bubble">Duel ahead. Spend wisely!</div>
+        </div>
+      </div>
+      <div class="shop-label">GEAR</div>
+      <div class="wares">${wares}</div>
+      <div class="shop-label">SCROLLS</div>
+      <div class="scrollrow">${scrolls}</div>
+      <div class="actions"><button class="btn go" id="leave">To the duel ▸</button></div>
+    </section>`;
+  fitStages(app);
+  app.querySelectorAll('[data-ware]').forEach((el) => {
+    el.onclick = () => itemSheet(ctx, run.shop[+el.dataset.ware].inst, { from: 'shop', ware: +el.dataset.ware });
+  });
+  app.querySelectorAll('[data-scroll]').forEach((el) => { el.onclick = () => scrollSheet(ctx, el.dataset.scroll); });
+  app.querySelector('#leave').onclick = ctx.leaveShop;
+  intro('shop');
 }
 
 // ---------------------------------------------------------------- menu & help
@@ -529,7 +611,8 @@ export function helpSheet() {
       <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear and pay more gold. A loss costs a life.</p>
       <p><b>Duels.</b> Rounds 3, 6 and 9 pit you against another player's saved build, hidden until the fight starts. Build for all-round strength; win to loot from their gear.</p>
       <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
-      <p><b>Scrolls.</b> Every item has 3 upgrade slots. Sure: 100%, +1. Chancy: 60%, +3. Long-shot: 10%, +8. A slot is used either way.</p>
+      <p><b>Shop.</b> Before each duel a merchant sells gear you can't get from monsters, plus scrolls.</p>
+      <p><b>Scrolls.</b> Bought at the shop. Every item has 3 upgrade slots. Sure: 100%, +1. Chancy: 60%, +3. Long-shot: 10%, +8. A slot is used either way.</p>
       <h3>Stats</h3>
       ${stat('DPS', 'Average damage per second.')}
       ${stat('EHP', 'Effective HP: health counting Def.')}

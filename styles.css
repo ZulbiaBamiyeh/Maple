@@ -481,3 +481,56 @@ h2 { font-size: 20px; line-height: 1.1; }
 .bs-stats b { color: var(--text); font-weight: 400; }
 .bs-slots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 12px; }
 .bs-slots .tile { width: 100%; height: auto; aspect-ratio: 1; border-width: 2px; }
+
+/* ------------------------------------------------------------------ shop */
+.shop-head { flex: none; display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: center; padding: 6px; }
+.merchant { position: relative; height: 96px; display: flex; align-items: flex-end; justify-content: center; border-radius: 4px; overflow: hidden; }
+.shop-title .kicker { font-family: var(--num); font-size: 10px; color: var(--gold); letter-spacing: 1px; }
+.bubble {
+  display: inline-block; margin-top: 4px; font-size: 13px; color: var(--ink); background: #fbf6ea;
+  border: 2px solid var(--ink); border-radius: 6px; padding: 2px 8px; position: relative;
+}
+.bubble::before { content: ''; position: absolute; left: -7px; top: 8px; border: 5px solid transparent; border-right-color: var(--ink); border-left: 0; }
+.shop-label { flex: none; font-family: var(--num); font-size: 10px; letter-spacing: 1px; color: var(--muted); margin-bottom: -4px; }
+.wares { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ware {
+  position: relative; display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto; gap: 4px 8px;
+  padding: 8px; min-height: 0; overflow: hidden; cursor: pointer; transition: transform .08s; align-items: start;
+}
+.ware:active { transform: scale(.97); }
+.ware .tile { grid-row: 1 / 3; width: 48px; height: 48px; align-self: center; }
+.ware-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.ware .nm { font-size: 14px; font-weight: 700; line-height: 1.1; }
+.ware .meta { font-size: 11px; color: var(--muted); }
+.ware .price { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--gold); }
+.ware.dear .price { color: var(--dim); }
+.ware.sold { opacity: .4; cursor: default; }
+.ware.sold .price { color: var(--muted); }
+.scrollrow { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.scrollbtn { flex-direction: column; gap: 0; min-height: 58px; padding: 4px; line-height: 1.15; }
+.scrollbtn .sn { font-size: 14px; }
+.scrollbtn small { font-family: var(--num); font-size: 10px; color: var(--muted); font-weight: 400; }
+.scrollbtn .sp { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--gold); }
+.need { flex-basis: 100%; text-align: center; font-size: 12px; color: var(--dim); }
+.sheet .btn small { font-family: var(--num); font-size: 11px; opacity: .85; }
+/* scroll sheet */
+.sc-head { display: flex; justify-content: space-between; align-items: center; }
+.sc-head .gold { display: flex; align-items: center; gap: 5px; color: var(--gold); font-size: 15px; }
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 12px; }
+.sc-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.sc-cell .tile { width: 52px; height: 52px; }
+.sc-left { font-family: var(--num); font-size: 9px; color: var(--gold); }
+.sc-stat { font-size: 10px; color: var(--dim); }
+.sc-cell.full { opacity: .35; pointer-events: none; }
+.sc-cell.full .sc-left { color: var(--dim); }
+.sc-cell.sc-ok .tile { animation: scok .6s steps(4); }
+.sc-cell.sc-fail .tile { animation: shake .3s steps(4); }
+@keyframes scok { 0% { box-shadow: 0 0 0 0 #ffe08a; filter: brightness(2); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.merchant { height: 112px; }
+.shop-head { grid-template-columns: 100px 1fr; }
+.ware .tile { grid-column: 1; grid-row: 1 / 3; }
+.ware-body { grid-column: 2; grid-row: 1; }
+.ware .price { grid-column: 2; grid-row: 2; justify-self: end; }
+.pricetag { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.pricetag span { display: inline-flex; align-items: center; gap: 4px; }
+.pricetag b { color: var(--gold); font-family: var(--num); }

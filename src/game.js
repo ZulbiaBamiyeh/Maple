@@ -3,10 +3,10 @@
 
 import { Rng, hash } from './rng.js';
 import {
-  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, SCROLLS, GOLD_WIN, GOLD_LOSS, slotKind,
+  ITEMS, MOBS, TIERS, GHOSTS, SLOTS, LIVES, ROUNDS, DUEL_ROUNDS, BAG_SIZE, SCROLLS, GOLD_WIN, GOLD_LOSS, SHOP_SIZE, SHOP_PRICE, shopTier, slotKind,
 } from './data.js';
 import {
-  rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot, scrapValue, applyScroll,
+  rollInstance, hydrate, heroFighter, mobFighter, headline, rollLoot, rollRarity, scrapValue, applyScroll,
 } from './items.js';
 import { simulate } from './sim.js';
 import { GIRL_HAIR, BOY_HAIR } from './art/hero.js';
@@ -102,6 +102,35 @@ export class Run {
     return headline(this.fighter(equip));
   }
 
+  // The shop before a duel: SHOP_SIZE distinct wares from the shop-only stock.
+  rollShop() {
+    const r = new Rng(hash(this.seed, this.round, 'shop'));
+    const pool = Object.values(ITEMS).filter((it) => it.shop).map((it) => it.id);
+    this.shop = r.shuffle(pool).slice(0, SHOP_SIZE).map((id) => {
+      const inst = rollInstance(id, rollRarity(shopTier(this.round), r), this.round, r);
+      return { inst, price: SHOP_PRICE[inst.rarity], sold: false };
+    });
+  }
+
+  // Buy ware i. action: 'equip' (the old piece goes to the bag, or is scrapped
+  // if the bag is full) or 'bag'. Returns false if it can't be bought.
+  buy(i, action, slot) {
+    const w = this.shop?.[i];
+    if (!w || w.sold || this.gold < w.price) return false;
+    if (action === 'bag' && this.bagFull()) return false;
+    this.gold -= w.price;
+    w.sold = true;
+    if (action === 'bag') { this.bag.push(w.inst); return true; }
+    slot = slot || this.slotFor(w.inst);
+    const old = this.equip[slot];
+    this.equip[slot] = w.inst;
+    if (old) {
+      if (this.bagFull()) this.gold += scrapValue(old);
+      else this.bag.push(old);
+    }
+    return true;
+  }
+
   // One mob per tier for hunts; a ghost from this round's pool for duels.
   rollRound() {
     const r = new Rng(hash(this.seed, this.round, 'offers'));
@@ -115,7 +144,9 @@ export class Run {
         equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round) : null])),
       };
       this.offers = null;
+      this.rollShop();
     } else {
+      this.shop = null;
       this.offers = ['easy', 'normal', 'elite'].map((t) => r.pick(TIERS[t].mobs));
       this.ghost = null;
     }
