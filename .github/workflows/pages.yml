@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -43,21 +41,3 @@ jobs:
           git add -A
           git commit -q -m "Deploy Gearfall ${GITHUB_SHA::7}"
           git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-      # If Pages is set to "GitHub Actions" instead of the gh-pages branch,
-      # deploy the same folder that way too. Harmless when Pages isn't on yet.
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-  pages-actions:
-    needs: deploy
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
