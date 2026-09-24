@@ -96,6 +96,25 @@ for (let i = 0; i < 400; i++) {
     await pg.click('[data-loot]');
     await pg.waitForTimeout(150);
     await pg.click('[data-act="equip"]');
+  } else if (await pg.$('#ev-go')) {
+    await shot('event-result-' + seen.size, false);
+    await pg.click('#ev-go');
+  } else if (await pg.$('[data-opt]')) {
+    // take the first offer that's open to us; pick the first item if asked
+    await shot('event-' + seen.size, false);
+    const opt = await pg.$('[data-opt]:not([disabled]):not(.leave)') || await pg.$('[data-opt].leave');
+    await opt.click();
+    await pg.waitForTimeout(300);
+    if (await pg.$('[data-uid]')) await pg.click('[data-uid]');
+  } else if (await pg.$('#leave')) {
+    if (!seen.has('shop')) { seen.add('shop'); await shot('shop'); }
+    const ware = await pg.$('[data-ware]:not(.dear)');
+    if (ware) {
+      await ware.click();
+      await pg.waitForTimeout(200);
+      if (await pg.$('[data-act="equip"]:not([disabled])')) await pg.click('[data-act="equip"]:not([disabled])');
+      else await pg.click('#leave');
+    } else await pg.click('#leave');
   } else if (await pg.$('#again')) { await shot('09-end'); break; }
   await pg.waitForTimeout(300);
   if (i === 6) await shot('08-mid');

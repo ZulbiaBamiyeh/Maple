@@ -5,9 +5,11 @@ export const BASE = { hp: 120, atk: 0, def: 0, crit: 0.05, haste: 0, lifesteal: 
 export const RESIST_CAP = 0.5;
 export const BAG_SIZE = 6;
 export const LIVES = 3;
+// Win this many duels for the Crown. Three lost duels end the run first.
+export const WIN_TARGET = 5;
 // A run is 5 days. Each day is three hunts and then a duel against another
 // player's build; the monsters get tougher, and stranger, every day.
-export const DAYS_IN_RUN = 5;
+export const DAYS_IN_RUN = 7;
 export const ROUNDS_PER_DAY = 4;
 export const ROUNDS = DAYS_IN_RUN * ROUNDS_PER_DAY;
 export const DUEL_ROUNDS = Array.from({ length: DAYS_IN_RUN }, (_, i) => (i + 1) * ROUNDS_PER_DAY);
@@ -106,6 +108,54 @@ export const FAMILIES = {
   yeti:   { name: 'Yeti',   status: 'stun',   set: { name: 'Yetiblood',   desc: '+25 HP, +2 Def',                  stats: { hp: 25, def: 2 } } },
   rime:   { name: 'Rime',   status: 'chill',  set: { name: 'Hoarfrost',   desc: '+20% damage vs Chilled',          mods: { vs: { chill: 0.2 } } } },
 };
+
+// Mirebog Swamp and Starfall Observatory
+Object.assign(FAMILIES, {
+  bog:    { name: 'Bog',    status: 'poison', set: { name: 'Bogheart',    desc: 'Poison max stacks +3, Regen 2/s', poisonMax: 3, regen: 2 } },
+  leech:  { name: 'Leech',  status: 'bleed',  set: { name: 'Bloodsucker', desc: '+8% Lifesteal',                   stats: { lifesteal: 0.08 } } },
+  astral: { name: 'Astral', status: 'shock',  set: { name: 'Starlit',     desc: '+10% Crit, +20% Crit dmg',        stats: { crit: 0.1, critDmg: 0.2 } } },
+  comet:  { name: 'Comet',  status: 'burn',   set: { name: 'Meteoric',    desc: '+2 Atk, Stun +0.2s',              stats: { atk: 2 }, stunBonus: 0.2 } },
+});
+
+// Four pieces of one family: a rule-bender on top of the 2-piece bonus, so a
+// build that commits to a family gets something no single item gives. Same
+// shape as a 2-piece set (stats, flags, mods, trigger), and many share a flag
+// with a keystone item, so a keystone plus a set can double down.
+const SET4 = {
+  slime:   { desc: 'Regen +3/s. Each Regen tick Poisons the foe.', regen: 3, flags: { regenPoison: true } },
+  spore:   { desc: 'Poison and Burn tick 30% faster.', flags: { dotRate: 0.7 } },
+  boar:    { desc: 'Bleed deals +6. +25% damage vs Bleeding.', bleedBonus: 6, mods: { vs: { bleed: 0.25 } } },
+  wisp:    { desc: '+10% Crit per Chill stack on the foe.', flags: { chillCrit: 0.1 } },
+  golem:   { desc: 'Gain Atk equal to half your Def.', flags: { juggernaut: 0.5 } },
+  imp:     { desc: 'Every 4s: burst all Burn on the foe.', trigger: { type: 'everySeconds', s: 4 }, effect: { detonate: 'burn' } },
+  coral:   { desc: 'Your Thorns also apply your on-hit statuses.', flags: { thornsProc: true } },
+  eel:     { desc: 'At max Shock the foe takes 8 per stack and Shock resets.', flags: { overload: 8 } },
+  pearl:   { desc: 'Hits deal +50% of your Shield. Every 6s: 10 Shield.', flags: { shieldBash: 0.5 },
+    trigger: { type: 'everySeconds', s: 6 }, effect: { shield: 10, target: 'self' } },
+  cog:     { desc: 'Every 3rd hit, your next hit crits.', trigger: { type: 'everyNthHit', n: 3 }, effect: { critNext: true, target: 'self' } },
+  rust:    { desc: 'Sunder max stacks +2 more. +25% damage vs Sundered.', flags: { sunderMax: 2 }, mods: { vs: { sunder: 0.25 } } },
+  spark:   { desc: 'Your Shock never fades.', flags: { shockKeep: true } },
+  bone:    { desc: 'Crits add a stack to every status on the foe.', flags: { critSpread: true } },
+  hex:     { desc: '+8% damage per different status on the foe.', flags: { statusCount: 0.08 } },
+  shade:   { desc: 'Each dodge: +2 Atk for the rest of the fight.', flags: { dodgeRage: 2 } },
+  drake:   { desc: 'Burn ticks can crit. +30% damage vs Burning.', burnCrit: true, mods: { vs: { burn: 0.3 } } },
+  storm:   { desc: 'Battle start: Frenzy 8s. +10% Haste.', stats: { haste: 0.1 },
+    trigger: { type: 'battleStart' }, effect: { apply: 'frenzy', duration: 8, target: 'self' } },
+  crystal: { desc: 'Your hits ignore all Def.', flags: { pierceAll: true } },
+  sand:    { desc: 'After a dodge your next hit crits. +5% Evasion.', stats: { evasion: 0.05 }, flags: { dodgeCrit: true } },
+  scarab:  { desc: 'When hit, 50%: 2 Poison on the attacker.', trigger: { type: 'onHitTaken', chance: 0.5 }, effect: { apply: 'poison', stacks: 2 } },
+  berry:   { desc: 'Bleed on the foe heals you for its damage.', flags: { bleedHeal: true } },
+  bee:     { desc: 'Statuses you apply have a 25% chance to land twice.', flags: { echo: 0.25 } },
+  yeti:    { desc: 'Every 4th hit: Stun 0.6s. Stuns last +0.4s.', stunBonus: 0.4,
+    trigger: { type: 'everyNthHit', n: 4 }, effect: { apply: 'stun', duration: 0.6 } },
+  rime:    { desc: 'Your Chill freezes at 2 stacks.', freezeAt: 2 },
+  bog:     { desc: 'Your Poison and Burn heal you for half their damage.', flags: { dotLeech: 0.5 } },
+  leech:   { desc: 'Healing past full HP becomes Shield.', flags: { overhealShield: true } },
+  astral:  { desc: 'Crits refund half your attack timer.', flags: { critHaste: true } },
+  comet:   { desc: 'Every 5th hit: a meteor for 4 per Burn on the foe.', trigger: { type: 'everyNthHit', n: 5 },
+    effect: { damagePerStack: { status: 'burn', per: 4 } } },
+};
+for (const [fam, s4] of Object.entries(SET4)) FAMILIES[fam].set4 = { name: FAMILIES[fam].set.name, ...s4 };
 
 // ---------------------------------------------------------------- items
 // `look` tells the paper doll how to draw the piece on the hero.
@@ -382,7 +432,85 @@ export const ITEMS = {
     icon: 'boots', look: { ramp: 'rime', trim: 'frost' }, flavor: 'Leave no footprints.' },
   frost_sigil: { name: 'Frost Sigil', slot: 'trinket', family: 'rime', icon: 't_sigil',
     trigger: { type: 'battleStart' }, effect: { apply: 'chill', stacks: 2 }, desc: 'Battle start: 2 Chill on the foe.' },
+
+  // a fourth wisp slot, so Rimebound can reach four pieces
+  frostweave_gloves: { name: 'Frostweave Gloves', slot: 'gloves', family: 'wisp', stats: { atk: 1, resist: 0.06 },
+    onHit: [{ chance: 0.1, apply: 'chill' }], icon: 'gloves', look: { ramp: 'ice', trim: 'frost' }, flavor: 'Knitted from a cold snap.' },
+
+  // ================================================================ Mirebog Swamp
+  // bog: poison and staying power
+  bogwood_staff: { name: 'Bogwood Staff', slot: 'weapon', type: 'staff', family: 'bog',
+    icon: 'staff', ramp: 'bog', onHit: [{ chance: 0.3, apply: 'poison' }], replaceOnHit: true, flavor: 'Magic. Drips, constantly.' },
+  toad_cap: { name: 'Toad Cap', slot: 'hat', family: 'bog', stats: { hp: 16, resist: 0.08 },
+    icon: 'hat_slime', look: { shape: 'slime', ramp: 'bog', trim: 'leaf' }, flavor: 'Ribbit, reluctantly.' },
+  mire_waders: { name: 'Mire Waders', slot: 'shoes', family: 'bog', stats: { hp: 14, def: 1 },
+    icon: 'boots', look: { ramp: 'bog', trim: 'leather' }, flavor: 'Knee-deep and dry.' },
+  bog_bubble: { name: 'Bog Bubble', slot: 'trinket', family: 'bog', icon: 't_bubble',
+    trigger: { type: 'everySeconds', s: 4 }, effect: { apply: 'poison', stacks: 2 }, desc: 'Every 4s: 2 Poison on the foe.' },
+  // leech: bleed and lifesteal
+  leechfang: { name: 'Leechfang', slot: 'weapon', type: 'dagger', family: 'leech', stats: { lifesteal: 0.04 },
+    icon: 'dagger', ramp: 'blood', onHit: [{ chance: 0.2, apply: 'bleed' }], flavor: 'It remembers every taste.' },
+  leech_wrap: { name: 'Leech Wrap', slot: 'top', family: 'leech', stats: { hp: 22, lifesteal: 0.05 },
+    icon: 'top_vest', look: { shape: 'vest', ramp: 'blood', trim: 'bog' }, flavor: 'Snug. Too snug.' },
+  sucker_gloves: { name: 'Sucker Gloves', slot: 'gloves', family: 'leech', stats: { atk: 2, lifesteal: 0.03 },
+    icon: 'gloves', look: { ramp: 'blood', trim: 'bog' }, flavor: 'Grip anything. Let go of nothing.' },
+  blood_pearl: { name: 'Blood Pearl', slot: 'trinket', family: 'leech', icon: 't_bloodpearl',
+    mods: { vs: { bleed: 0.15 } }, stats: { lifesteal: 0.05 }, desc: '+15% damage vs Bleeding foes.' },
+
+  // ================================================================ Starfall Observatory
+  // astral: crits
+  starlight_rapier: { name: 'Starlight Rapier', slot: 'weapon', type: 'sword', family: 'astral', stats: { crit: 0.05 },
+    icon: 'sword', ramp: 'astral', onHit: [{ chance: 0.15, apply: 'shock' }], flavor: 'Points at whatever it wants to hit.' },
+  astral_circlet: { name: 'Astral Circlet', slot: 'hat', family: 'astral', stats: { hp: 12, crit: 0.06 },
+    icon: 'hat_crown', look: { shape: 'crown', ramp: 'astral', trim: 'gold' }, flavor: 'A little night sky, worn.' },
+  nebula_robe: { name: 'Nebula Robe', slot: 'top', family: 'astral', stats: { hp: 20, critDmg: 0.2 },
+    icon: 'top_robe', look: { shape: 'robe', ramp: 'astral', trim: 'night' }, flavor: 'Galaxies in the lining.' },
+  star_chart: { name: 'Star Chart', slot: 'trinket', family: 'astral', icon: 't_chart',
+    trigger: { type: 'onCrit' }, effect: { apply: 'shock', stacks: 2 }, desc: 'On crit: 2 Shock.' },
+  // comet: burn and stuns
+  comet_hammer: { name: 'Comet Hammer', slot: 'weapon', type: 'mace', family: 'comet',
+    icon: 'mace', ramp: 'comet', onHit: [{ chance: 0.2, apply: 'burn' }], flavor: 'Came down from the sky. Still angry.' },
+  meteor_gauntlets: { name: 'Meteor Gauntlets', slot: 'gloves', family: 'comet', stats: { atk: 3 },
+    icon: 'gloves_spiked', look: { ramp: 'comet', trim: 'ember' }, flavor: 'Warm to the touch. Very warm.' },
+  cometstride_boots: { name: 'Cometstride Boots', slot: 'shoes', family: 'comet', stats: { haste: 0.1, hp: 8 },
+    icon: 'boots', look: { ramp: 'comet', trim: 'ember' }, flavor: 'Leave a trail. Always.' },
+  stardust_vial: { name: 'Stardust Vial', slot: 'trinket', family: 'comet', icon: 't_stardust',
+    trigger: { type: 'everyNthHit', n: 4 }, effect: { apply: 'burn' }, desc: 'Every 4th hit: Burn.' },
 };
+
+// Keystones: one per biome, dropped by its Normal and Elite monsters. Each
+// changes a rule rather than adding stats, so a build can be built around it.
+// Never common. Several share a flag with a family's 4-piece bonus.
+Object.assign(ITEMS, {
+  mycelial_heart: { name: 'Mycelial Heart', slot: 'top', keystone: true, family: null, stats: { hp: 16, regen: 2 }, tags: ['poison', 'regen'],
+    flags: { regenPoison: true }, icon: 'top_robe', look: { shape: 'robe', ramp: 'spore', trim: 'leaf' },
+    desc: 'Each Regen tick Poisons the foe.' },
+  pearl_bulwark: { name: 'Pearl Bulwark', slot: 'hat', keystone: true, family: null, stats: { hp: 14, def: 1 }, tags: ['shield'],
+    flags: { shieldBash: 0.5 }, trigger: { type: 'battleStart' }, effect: { shield: 12, target: 'self' },
+    icon: 'hat_shell', look: { shape: 'shell', ramp: 'pearl', trim: 'sea' }, desc: 'Start with 12 Shield. Hits deal +50% of your Shield as damage.' },
+  tesla_coil: { name: 'Tesla Coil', slot: 'gloves', keystone: true, family: null, stats: { atk: 1 }, tags: ['shock'],
+    onHit: [{ chance: 0.15, apply: 'shock' }], flags: { overload: 8 },
+    icon: 'gloves_spiked', look: { ramp: 'brass', trim: 'spark' }, desc: 'At max Shock the foe takes 8 per stack and Shock resets.' },
+  bloodletter: { name: 'Bloodletter', slot: 'weapon', type: 'axe', keystone: true, family: null, tags: ['bleed'],
+    flags: { bleedHeal: true }, icon: 'axe', ramp: 'blood', desc: 'Bleed on the foe heals you for its damage.' },
+  juggernaut_plate: { name: 'Juggernaut Plate', slot: 'top', keystone: true, family: null, stats: { hp: 30, def: 5, haste: -0.05 },
+    flags: { juggernaut: 0.5 }, icon: 'top_plate', look: { shape: 'plate', ramp: 'drake', trim: 'steel' }, desc: 'Gain Atk equal to half your Def.' },
+  dervish_slippers: { name: 'Dervish Slippers', slot: 'shoes', keystone: true, family: null, stats: { evasion: 0.08 },
+    flags: { dodgeRage: 2 }, icon: 'boots', look: { ramp: 'sand', trim: 'berry' }, desc: 'Each dodge: +2 Atk for the rest of the fight.' },
+  briar_crown: { name: 'Briar Crown', slot: 'hat', keystone: true, family: null, stats: { hp: 10, thorns: 2 }, tags: ['bleed', 'poison'],
+    flags: { thornsProc: true }, icon: 'hat_crown', look: { shape: 'crown', ramp: 'leaf', trim: 'berry' },
+    desc: 'Your Thorns also apply your on-hit statuses.' },
+  frostbite_gauntlets: { name: 'Frostbite Gauntlets', slot: 'gloves', keystone: true, family: null, stats: { crit: 0.03 }, tags: ['chill'],
+    onHit: [{ chance: 0.1, apply: 'chill' }], flags: { chillCrit: 0.1 },
+    icon: 'gloves', look: { ramp: 'rime', trim: 'frost' }, desc: '+10% Crit per Chill stack on the foe.' },
+  plague_mask: { name: 'Plague Doctor Mask', slot: 'hat', keystone: true, family: null, stats: { hp: 12, resist: 0.05 },
+    tags: ['poison', 'bleed', 'burn', 'hex'], flags: { statusCount: 0.08 },
+    icon: 'hat_goggles', look: { shape: 'goggles', ramp: 'bog', trim: 'leather' }, desc: '+8% damage per different status on the foe.' },
+  star_splitter: { name: 'Star Splitter', slot: 'weapon', type: 'sword', keystone: true, family: null, stats: { crit: 0.05 },
+    tags: ['poison', 'shock', 'chill', 'sunder', 'burn'], flags: { critSpread: true },
+    icon: 'sword', ramp: 'astral', desc: 'Crits add a stack to every status on the foe.' },
+});
+export const KEYSTONES = Object.keys(ITEMS).filter((id) => ITEMS[id].keystone);
 // Relics: one per elite. Rule-bending trinkets that don't do much alone but
 // can carry a whole build. Never common. `flags` feed the sim directly.
 Object.assign(ITEMS, {
@@ -424,6 +552,7 @@ export const RELIC_OF = {
   elder_drake: 'phoenix_feather', prism_colossus: 'glass_heart',
   sand_wyrm: 'gilded_hourglass', pharaoh_sphinx: 'sunstone_idol', elder_treant: 'bloodpact_chalice', wasp_queen: 'royal_jelly',
   abominable: 'glass_heart', frost_wyrm: 'heart_of_winter',
+  swamp_croc: 'bloodpact_chalice', bog_mother: 'plague_censer', astromancer: 'echo_conch', meteor_golem: 'phoenix_feather',
 };
 for (const [id, it] of Object.entries(ITEMS)) it.id = id;
 
@@ -634,8 +763,62 @@ Object.assign(MOBS, {
     hp: 220, min: 12, max: 17, interval: 1.3, def: 3, magic: true, onHit: [{ chance: 0.4, apply: 'chill' }], stats: { resist: 0.2 },
     triggers: [ab({ type: 'everySeconds', s: 5 }, { shield: 15, target: 'self' }, 'Ice scales')], trait: 'Magic, Chill, ice scales',
     drops: ['icicle_lance', 'rime_gloves', 'snowdrift_boots', 'frost_sigil'] },
+
+  // ================================================================ Mirebog Swamp
+  bog_toad: { name: 'Bog Toad', tier: 'easy', family: 'bog', sprite: 'toad',
+    hp: 75, min: 4, max: 6, interval: 1.0, def: 1, onHit: [{ chance: 0.3, apply: 'poison' }], trait: '30% Poison',
+    drops: ['bogwood_staff', 'toad_cap', 'mire_waders', 'bog_bubble'] },
+  swamp_leech: { name: 'Swamp Leech', tier: 'easy', family: 'leech', sprite: 'leech',
+    hp: 70, min: 3, max: 5, interval: 0.8, def: 0, onHit: [{ chance: 0.25, apply: 'bleed' }], stats: { lifesteal: 0.25 },
+    trait: 'Drains life, Bleed', drops: ['leechfang', 'leech_wrap', 'sucker_gloves', 'blood_pearl'] },
+  mud_golem: { name: 'Mud Golem', tier: 'normal', family: 'bog', sprite: 'mudgolem',
+    hp: 170, min: 10, max: 14, interval: 1.5, def: 3, regen: 3, onHit: [{ chance: 0.25, apply: 'poison' }],
+    trait: 'Def 3, Regen, Poison', drops: ['bogwood_staff', 'toad_cap', 'mire_waders', 'bog_bubble'] },
+  blood_gnat: { name: 'Blood Gnats', tier: 'normal', family: 'leech', sprite: 'gnats',
+    hp: 105, min: 5, max: 7, interval: 0.5, def: 0, onHit: [{ chance: 0.2, apply: 'bleed' }], stats: { evasion: 0.2, lifesteal: 0.15 },
+    trait: 'Swarm: very fast, dodges', drops: ['leechfang', 'leech_wrap', 'sucker_gloves', 'blood_pearl'] },
+  swamp_croc: { name: 'Swamp Croc', tier: 'elite', family: 'leech', sprite: 'croc',
+    hp: 260, min: 18, max: 24, interval: 1.7, def: 5, onHit: [{ chance: 0.35, apply: 'bleed' }], stats: { lifesteal: 0.15 },
+    triggers: [ab({ type: 'hpBelow', pct: 0.4 }, { apply: 'frenzy', duration: 6, target: 'self' }, 'Death roll')], trait: 'Def 5, Bleed, drains',
+    drops: ['leechfang', 'leech_wrap', 'sucker_gloves', 'blood_pearl'] },
+  bog_mother: { name: 'Bog Mother', tier: 'elite', family: 'bog', sprite: 'bogmother',
+    hp: 200, min: 9, max: 13, interval: 1.1, def: 2, magic: true, onHit: [{ chance: 0.4, apply: 'poison' }, { chance: 0.2, apply: 'hex' }],
+    triggers: [ab({ type: 'everySeconds', s: 5 }, { heal: 18 }, 'Mudbath')], trait: 'Magic, Poison, Hex, heals',
+    drops: ['bogwood_staff', 'toad_cap', 'mire_waders', 'bog_bubble'] },
+
+  // ================================================================ Starfall Observatory
+  starling: { name: 'Starling', tier: 'easy', family: 'astral', sprite: 'starling',
+    hp: 65, min: 4, max: 6, interval: 0.9, def: 0, magic: true, stats: { crit: 0.2 }, onHit: [{ chance: 0.2, apply: 'shock' }],
+    trait: 'Magic, 20% Crit', drops: ['starlight_rapier', 'astral_circlet', 'nebula_robe', 'star_chart'] },
+  meteorite: { name: 'Meteorite', tier: 'easy', family: 'comet', sprite: 'meteorite',
+    hp: 85, min: 5, max: 7, interval: 1.3, def: 3, onHit: [{ chance: 0.3, apply: 'burn' }], trait: 'Def 3, 30% Burn',
+    drops: ['comet_hammer', 'meteor_gauntlets', 'cometstride_boots', 'stardust_vial'] },
+  orrery: { name: 'Orrery Sentinel', tier: 'normal', family: 'astral', sprite: 'orrery',
+    hp: 140, min: 9, max: 12, interval: 1.1, def: 3, stats: { crit: 0.2, critDmg: 0.3 },
+    triggers: [ab({ type: 'everySeconds', s: 5 }, { shield: 14, target: 'self' }, 'Alignment')], trait: 'Crits hard, shields',
+    drops: ['starlight_rapier', 'astral_circlet', 'nebula_robe', 'star_chart'] },
+  nova_moth: { name: 'Nova Moth', tier: 'normal', family: 'comet', sprite: 'moth',
+    hp: 115, min: 6, max: 9, interval: 0.7, def: 0, onHit: [{ chance: 0.35, apply: 'burn' }], stats: { evasion: 0.12 },
+    trait: 'Fast, 35% Burn, dodges', drops: ['comet_hammer', 'meteor_gauntlets', 'cometstride_boots', 'stardust_vial'] },
+  astromancer: { name: 'Astromancer', tier: 'elite', family: 'astral', sprite: 'astromancer',
+    hp: 190, min: 10, max: 14, interval: 1.1, def: 1, magic: true, onHit: [{ chance: 0.35, apply: 'shock' }], stats: { crit: 0.2 },
+    triggers: [ab({ type: 'battleStart' }, { shield: 30, target: 'self' }, 'Starshield')], trait: 'Magic, Shock, crits, shield',
+    drops: ['starlight_rapier', 'astral_circlet', 'nebula_robe', 'star_chart'] },
+  meteor_golem: { name: 'Meteor Golem', tier: 'elite', family: 'comet', sprite: 'meteorgolem',
+    hp: 280, min: 19, max: 26, interval: 2.0, def: 6, onHit: [{ chance: 0.35, apply: 'burn' }, { chance: 0.15, apply: 'stun', duration: 0.8 }],
+    trait: 'Def 6, Burn, Stun', drops: ['comet_hammer', 'meteor_gauntlets', 'cometstride_boots', 'stardust_vial'] },
 });
 for (const [id, m] of Object.entries(MOBS)) m.id = id;
+
+// Each biome's keystone drops from one Normal and one Elite there.
+const KEYSTONE_OF = {
+  mycelial_heart: ['shroom_knight', 'stone_golem'], pearl_bulwark: ['pearl_oyster', 'king_snapjaw'],
+  tesla_coil: ['arc_sprite', 'tesla_sentinel'], bloodletter: ['shade_stalker', 'bone_knight'],
+  juggernaut_plate: ['crystal_tortoise', 'prism_colossus'], dervish_slippers: ['mummy', 'sand_wyrm'],
+  briar_crown: ['thorn_hog', 'elder_treant'], frostbite_gauntlets: ['frost_wolf', 'frost_wyrm'],
+  plague_mask: ['mud_golem', 'bog_mother'], star_splitter: ['orrery', 'astromancer'],
+};
+for (const [item, mobs] of Object.entries(KEYSTONE_OF)) for (const m of mobs) MOBS[m].drops = [...MOBS[m].drops, item];
 
 for (const [mob, relic] of Object.entries(RELIC_OF)) MOBS[mob].drops.push(relic);
 
@@ -661,6 +844,10 @@ export const BIOMES = [
     easy: ['berry_sprout', 'bumble_bee'], normal: ['thorn_hog', 'honey_bear'], elite: ['elder_treant', 'wasp_queen'] } },
   { id: 'glacier', name: 'Frostfang Glacier', biome: 'glacier', tiers: {
     easy: ['snow_puff', 'ice_penguin'], normal: ['frost_wolf', 'yeti'], elite: ['abominable', 'frost_wyrm'] } },
+  { id: 'swamp', name: 'Mirebog Swamp', biome: 'swamp', tiers: {
+    easy: ['bog_toad', 'swamp_leech'], normal: ['mud_golem', 'blood_gnat'], elite: ['swamp_croc', 'bog_mother'] } },
+  { id: 'observatory', name: 'Starfall Observatory', biome: 'observatory', tiers: {
+    easy: ['starling', 'meteorite'], normal: ['orrery', 'nova_moth'], elite: ['astromancer', 'meteor_golem'] } },
 ];
 export const BIOME = Object.fromEntries(BIOMES.map((b) => [b.id, b]));
 // The original five-day order, for saves from before biomes were shuffled.
@@ -841,4 +1028,45 @@ export const GHOSTS = [
     look: { gender: 'girl', hair: 'twintails', hairColor: 'lavender', skin: 'fair', eyes: 'pink' },
     equip: { weapon: g('prism_lance', 'rare', [{ stat: 'hp', value: 15 }], ['opener_shield']), hat: g('crystal_crown'), top: g('geode_plate'),
       shoes: g('spring_boots'), gloves: g('oil_gauntlets'), trinket1: g('refraction_gem'), trinket2: g('last_stand_locket') } },
+
+  // day 6 (round 24): full sets and keystones start to show
+  { id: 'bramblewick', name: 'Bramblewick', record: '20-3', round: 24, archetype: 'Thorn bleeder',
+    look: { gender: 'boy', hair: 'messy', hairColor: 'mint', skin: 'tan', eyes: 'green' },
+    equip: { weapon: g('barberry_whip', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'hp', value: 15 }], ['vs_bleed']), hat: g('briar_crown', 'rare'),
+      top: g('bramble_vest', 'rare'), gloves: g('thornleaf_gloves'), shoes: g('mire_waders'), trinket1: g('berry_brooch'), trinket2: g('refraction_gem') } },
+  { id: 'celestine', name: 'Celestine', record: '21-2', round: 24, archetype: 'Star crit',
+    look: { gender: 'girl', hair: 'long', hairColor: 'silver', skin: 'fair', eyes: 'violet' },
+    equip: { weapon: g('starlight_rapier', 'epic', [{ stat: 'crit', value: 0.05 }, { stat: 'atk', value: 2 }], ['shock_on_crit']), hat: g('astral_circlet', 'rare'),
+      top: g('nebula_robe'), gloves: g('dynamo_gloves'), shoes: g('spring_boots'), trinket1: g('star_chart'), trinket2: g('knucklebones') } },
+  { id: 'mirelda', name: 'Mirelda', record: '20-3', round: 24, archetype: 'Bog poison',
+    look: { gender: 'girl', hair: 'bob', hairColor: 'lavender', skin: 'deep', eyes: 'green' },
+    equip: { weapon: g('bogwood_staff', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'hp', value: 15 }], ['burst_poison']), hat: g('toad_cap'),
+      top: g('mycelial_heart', 'rare'), shoes: g('mire_waders'), gloves: g('gel_gloves'), trinket1: g('bog_bubble'), trinket2: g('plague_censer', 'rare') } },
+
+  // day 7 (round 28): the final duel
+  { id: 'glaciera', name: 'Glaciera', record: '25-2', round: 28, archetype: 'Frost lock',
+    look: { gender: 'girl', hair: 'twintails', hairColor: 'silver', skin: 'light', eyes: 'blue' },
+    equip: { weapon: g('icicle_lance', 'epic', [{ stat: 'status', value: 0.05 }, { stat: 'crit', value: 0.05 }], ['vs_chill']), hat: g('wisp_hood', 'rare'),
+      top: g('fur_mantle', 'rare'), gloves: g('frostbite_gauntlets', 'rare'), shoes: g('snowdrift_boots'), trinket1: g('frost_sigil'), trinket2: g('heart_of_winter', 'rare') } },
+  { id: 'krogg', name: 'Krogg', record: '24-3', round: 28, archetype: 'Juggernaut',
+    look: { gender: 'boy', hair: 'crop', hairColor: 'chestnut', skin: 'deep', eyes: 'amber' },
+    equip: { weapon: g('glacier_maul', 'epic', [{ stat: 'hp', value: 15 }, { stat: 'atk', value: 2 }], ['opener_shield']), hat: g('yeti_helm', 'rare'),
+      top: g('juggernaut_plate', 'rare'), gloves: g('scarab_gauntlets', 'rare'), shoes: g('mire_waders'), trinket1: g('titan_core'), trinket2: g('avalanche_bell') } },
+  { id: 'nyx', name: 'Nyx', record: '25-2', round: 28, archetype: 'Dodge assassin',
+    look: { gender: 'girl', hair: 'ponytail', hairColor: 'raven', skin: 'tan', eyes: 'amber' },
+    equip: { weapon: g('nightfang', 'epic', [{ stat: 'haste', value: 0.06 }, { stat: 'crit', value: 0.05 }], ['riposte']), hat: g('nomad_wrap', 'rare'),
+      top: g('shadow_cloak', 'rare'), shoes: g('dervish_slippers', 'rare'), gloves: g('sucker_gloves'), trinket1: g('mirage_charm'), trinket2: g('mirror_shard') } },
 ];
+
+// ---------------------------------------------------------------- gold and the shop
+// Gold comes from fights and from selling spare gear. The merchant sets up
+// after the day-2 and day-5 duels.
+export const GOLD_WIN = { easy: 2, normal: 3, elite: 5, duel: 6 };
+export const GOLD_DUEL_LOSS = 3;
+export const SELL_PRICE = { common: 1, rare: 2, epic: 4 };
+export const SHOP_AFTER_DAYS = [2, 5];
+export const SHOP_PRICE = { common: 5, rare: 9, epic: 14 };
+export const KEYSTONE_MARKUP = 4;
+export const SHOP_REROLL = 3;
+// One free loot reroll per day.
+export const REROLLS_PER_DAY = 1;

@@ -20,6 +20,8 @@ const BIOMES = {
   desert: { sky: ['#f2a65a', '#ffc98a', '#ffe8b8'], far: '#e0a868', near: '#d09050', ground: ['#f2d48a', '#d0a458', '#b08040', '#7a5a2e'], deco: 'desert' },
   orchard: { sky: ['#8fd0f0', '#b8e4f8', '#e8f8ff'], far: '#7ab870', near: '#4e9440', ground: ['#86c860', '#4e9440', '#7a4a2c', '#4e2e1d'], deco: 'orchard' },
   glacier: { sky: ['#bfe0f8', '#d8eefc', '#f2faff'], far: '#a8c8e8', near: '#d8ecfa', ground: ['#ffffff', '#d8ecfa', '#8fb8e0', '#5a7eb0'], deco: 'glacier' },
+  swamp: { sky: ['#2e3a2a', '#44563a', '#6a7a4a'], far: '#3a4a30', near: '#2a3624', ground: ['#5a6a3a', '#3e4a28', '#3a3020', '#22200e'], deco: 'swamp' },
+  observatory: { sky: ['#0e0c2a', '#1e1a4a', '#3a2e6e'], far: '#2a2450', near: '#1a1638', ground: ['#8a86b0', '#5a5680', '#3a3658', '#221e3a'], deco: 'observatory' },
 };
 
 export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
@@ -106,6 +108,19 @@ export function drawScene(ctx, W, H, biome, groundY, seed = 7) {
   if (b.deco === 'orchard') {
     for (let i = 0; i < 3; i++) cloud(ctx, Math.floor(rnd() * W), 6 + Math.floor(rnd() * groundY * 0.3), '#ffffff', rnd);
     for (let i = 0; i < 5; i++) berryTree(ctx, Math.floor(rnd() * W), groundY, rnd);
+  }
+  if (b.deco === 'swamp') {
+    // fireflies, dead trees and a murky pool
+    for (let i = 0; i < W / 10; i++) px(Math.floor(rnd() * W), Math.floor(groundY * 0.3 + rnd() * groundY * 0.6), '#d8f06a');
+    for (let i = 0; i < 3; i++) deadTree(ctx, Math.floor(rnd() * W), groundY, 12 + Math.floor(rnd() * 8));
+    ctx.fillStyle = 'rgba(160, 200, 120, 0.12)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(Math.floor(rnd() * W) - 20, groundY - 3 - Math.floor(rnd() * 5), 30 + Math.floor(rnd() * 30), 2);
+  }
+  if (b.deco === 'observatory') {
+    for (let i = 0; i < W / 3; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY * 0.8), rnd() > 0.8 ? '#ffd36b' : '#f4f1ff');
+    // a falling star and the observatory dome
+    for (let i = 0; i < 8; i++) px(Math.floor(W * 0.2) + i * 2, 10 + i, i < 2 ? '#ffffff' : '#c8c0ff');
+    dome(ctx, Math.floor(W * (0.6 + rnd() * 0.25)), groundY);
   }
   if (b.deco === 'glacier') {
     for (let i = 0; i < W / 5; i++) px(Math.floor(rnd() * W), Math.floor(rnd() * groundY), '#ffffff');
@@ -272,4 +287,26 @@ function berryTree(ctx, x, groundY, rnd) {
   circle(ctx, x + 3, groundY - h + 1, 3, '#5fa84a');
   ctx.fillStyle = '#d63a5a';
   for (let i = 0; i < 4; i++) ctx.fillRect(x + Math.floor(rnd() * 9), groundY - h - 1 + Math.floor(rnd() * 6), 1, 1);
+}
+
+function deadTree(ctx, x, groundY, h) {
+  ctx.fillStyle = '#1e2618';
+  ctx.fillRect(x, groundY - h, 2, h);
+  ctx.fillRect(x - 3, groundY - h + 3, 3, 1);
+  ctx.fillRect(x - 3, groundY - h + 1, 1, 2);
+  ctx.fillRect(x + 2, groundY - h + 5, 3, 1);
+  ctx.fillRect(x + 4, groundY - h + 2, 1, 3);
+}
+
+function dome(ctx, cx, groundY) {
+  ctx.fillStyle = '#3a3658';
+  ctx.fillRect(cx - 9, groundY - 10, 18, 10);
+  circle(ctx, cx, groundY - 10, 8, '#5a5680');
+  ctx.fillStyle = '#1a1638';
+  ctx.fillRect(cx - 1, groundY - 18, 3, 8);
+  ctx.fillStyle = '#8a86b0';
+  ctx.fillRect(cx + 1, groundY - 21, 5, 2);
+  ctx.fillStyle = '#ffd36b';
+  ctx.fillRect(cx - 5, groundY - 6, 2, 2);
+  ctx.fillRect(cx + 4, groundY - 6, 2, 2);
 }

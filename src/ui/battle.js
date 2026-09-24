@@ -29,11 +29,14 @@ const MOB_STYLE = {
   skink: 'lunge', beetle: 'charge', scorpion: 'lunge', mummy: 'lunge', sandwyrm: 'slam', sphinx: 'cast',
   sprout: 'hop', bee: 'lunge', hedgehog: 'charge', bear: 'slam', treant: 'slam', waspqueen: 'lunge',
   snowpuff: 'cast', penguin: 'charge', wolf: 'charge', yeti: 'slam', abominable: 'slam', frostwyrm: 'cast',
+  toad: 'hop', leech: 'lunge', mudgolem: 'slam', gnats: 'lunge', croc: 'charge', bogmother: 'cast',
+  starling: 'cast', meteorite: 'charge', orrery: 'cast', moth: 'lunge', astromancer: 'cast', meteorgolem: 'slam',
 };
 // Bolt colours for casters (and the tint of their swing trails).
 const MOB_COLOR = {
   wisp: '#9fe0ff', imp: '#f58a3a', siren: '#74e0d0', sprite: '#fff27a', tesla: '#fff27a', witch: '#c07cff', emberling: '#ffc84a',
   pumpkin: '#ffc84a', sphinx: '#6cc24a', snowpuff: '#c9f3ff', frostwyrm: '#8fd8f0',
+  bogmother: '#9ee06a', starling: '#fff6c8', orrery: '#ffd36b', astromancer: '#c8c0ff',
 };
 // How close each style gets to its target before striking, in pixels of gap
 // left between them. Ranged styles barely step forward.

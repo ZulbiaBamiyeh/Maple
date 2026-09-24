@@ -9,7 +9,7 @@ let uidCounter = 1;
 export const newUid = () => 'i' + (uidCounter++).toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 
 const PCT = new Set(['crit', 'haste', 'resist', 'lifesteal', 'evasion', 'critDmg']);
-const STAT_KEYS = ['hp', 'def', 'atk', 'crit', 'haste', 'resist', 'lifesteal', 'evasion', 'critDmg', 'thorns', 'pen'];
+const STAT_KEYS = ['hp', 'def', 'atk', 'crit', 'haste', 'resist', 'lifesteal', 'evasion', 'critDmg', 'thorns', 'pen', 'regen'];
 const roundStat = (stat, v) => (PCT.has(stat) ? Math.round(v * 100) / 100 : Math.round(v));
 
 export function rollInstance(itemId, rarity, round, rng) {
@@ -32,6 +32,15 @@ export function itemTags(def) {
   if (def.effect?.apply) tags.add(def.effect.apply);
   for (const t of def.tags || []) tags.add(t);
   return tags;
+}
+
+// One perk that isn't in `have`: 60% of the time one that fits the item's statuses.
+export function rollPerk(def, rng, have = []) {
+  const tags = itemTags(def);
+  const free = Object.values(PERKS).filter((p) => !have.includes(p.id));
+  const fitting = free.filter((p) => p.tags.some((t) => tags.has(t)));
+  const general = free.filter((p) => !p.tags.length);
+  return rng.pick(fitting.length && rng.chance(0.6) ? fitting : general.length ? general : free).id;
 }
 
 // Perks by rarity; 60% of the time a perk that fits the item's statuses.
@@ -101,9 +110,14 @@ function mergeMods(into, m) {
   if (m.glass) into.glass = { out: (into.glass?.out || 0) + m.glass.out, in: (into.glass?.in || 0) + m.glass.in };
 }
 
-// Sim flags: numbers stack, switches just turn on.
+// Sim flags: numbers stack, switches just turn on. Thresholds and rates keep
+// the best (lowest) value instead of adding up.
+const MIN_FLAGS = new Set(['dotRate', 'freezeAt']);
 function mergeFlags(into, flags) {
-  for (const [k, v] of Object.entries(flags || {})) into[k] = typeof v === 'number' ? (into[k] || 0) + v : v;
+  for (const [k, v] of Object.entries(flags || {})) {
+    if (MIN_FLAGS.has(k)) into[k] = Math.min(into[k] ?? Infinity, v);
+    else into[k] = typeof v === 'number' ? (into[k] || 0) + v : v;
+  }
 }
 
 // Trinket effect with round-scaled magnitudes.
@@ -113,7 +127,8 @@ function scaledEffect(effect, scale) {
   return e;
 }
 
-export function activeSets(equip) {
+// Pieces worn per family. Two copies of one item count once.
+export function setCounts(equip) {
   const counts = {};
   const seen = new Set();
   for (const inst of Object.values(equip)) {
@@ -123,17 +138,33 @@ export function activeSets(equip) {
     seen.add(inst.item);
     counts[fam] = (counts[fam] || 0) + 1;
   }
-  return Object.keys(counts).filter((f) => counts[f] >= 2);
+  return counts;
 }
 
-export function setCounts(equip) {
-  const counts = {};
-  for (const inst of Object.values(equip)) {
-    if (!inst) continue;
-    const fam = ITEMS[inst.item].family;
-    if (fam) counts[fam] = (counts[fam] || 0) + 1;
-  }
-  return counts;
+// Families with their 2-piece bonus on, and those with the 4-piece too.
+export function activeSets(equip) {
+  const counts = setCounts(equip);
+  return Object.keys(counts).filter((f) => counts[f] >= 2);
+}
+export function fullSets(equip) {
+  const counts = setCounts(equip);
+  return Object.keys(counts).filter((f) => counts[f] >= 4 && FAMILIES[f].set4);
+}
+
+function applySet(f, set, round) {
+  if (set.regen) f.regen += Math.round(set.regen * scaleFor(round));
+  if (set.def) f.def += set.def;
+  if (set.poisonMax) f.sets.poisonMax = Math.max(f.sets.poisonMax || 0, set.poisonMax);
+  if (set.bleedBonus) f.sets.bleedBonus = Math.max(f.sets.bleedBonus || 0, set.bleedBonus);
+  if (set.freezeAt) f.sets.freezeAt = Math.min(f.sets.freezeAt ?? Infinity, set.freezeAt);
+  if (set.stunBonus) f.sets.stunBonus = (f.sets.stunBonus || 0) + set.stunBonus;
+  if (set.burnCrit) f.sets.burnCrit = true;
+  // newer sets: flat stats, flags, modifiers, a trigger, a faster first swing
+  for (const [k, v] of Object.entries(set.stats || {})) f[k] += v;
+  mergeFlags(f.sets, set.flags);
+  mergeMods(f.mods, set.mods);
+  if (set.trigger) f.triggers.push({ trigger: set.trigger, effect: scaledEffect(set.effect, scaleFor(round)), source: set.name });
+  if (set.firstSwing) f.weapon.firstSwing = Math.min(f.weapon.firstSwing ?? Infinity, set.firstSwing);
 }
 
 // Build = { name, round, equip: { slot: instance } } -> fighter spec for simulate().
@@ -178,22 +209,10 @@ export function heroFighter(build) {
       if (p.trigger) f.triggers.push({ trigger: p.trigger, effect: scaledEffect(p.effect, power(inst)), source: def.name, slot });
     }
   }
-  for (const fam of activeSets(equip)) {
-    const set = FAMILIES[fam].set;
-    if (set.regen) f.regen += Math.round(set.regen * scaleFor(round));
-    if (set.def) f.def += set.def;
-    if (set.poisonMax) f.sets.poisonMax = set.poisonMax;
-    if (set.bleedBonus) f.sets.bleedBonus = set.bleedBonus;
-    if (set.freezeAt) f.sets.freezeAt = set.freezeAt;
-    if (set.stunBonus) f.sets.stunBonus = set.stunBonus;
-    if (set.burnCrit) f.sets.burnCrit = true;
-    // newer sets: flat stats, flags, modifiers, a trigger, a faster first swing
-    for (const [k, v] of Object.entries(set.stats || {})) f[k] += v;
-    mergeFlags(f.sets, set.flags);
-    mergeMods(f.mods, set.mods);
-    if (set.trigger) f.triggers.push({ trigger: set.trigger, effect: scaledEffect(set.effect, scaleFor(round)), source: set.name });
-    if (set.firstSwing) f.weapon.firstSwing = Math.min(f.weapon.firstSwing ?? Infinity, set.firstSwing);
-  }
+  for (const fam of activeSets(equip)) applySet(f, FAMILIES[fam].set, round);
+  for (const fam of fullSets(equip)) applySet(f, FAMILIES[fam].set4, round);
+  // Juggernaut: Def turns into Atk.
+  if (f.sets.juggernaut) f.atk += Math.round(f.def * f.sets.juggernaut);
   f.resist = Math.min(RESIST_CAP, f.resist);
   f.haste = Math.max(-0.5, f.haste);
   f.crit = Math.min(1, f.crit);
@@ -239,7 +258,7 @@ export function rollLoot(pool, tier, round, rng, bump = false, day = 1, count = 
   for (let i = 0; i < count; i++) {
     const id = picks[i % picks.length];
     let rarity = rollRarity(tier, rng, bump, day);
-    if (ITEMS[id].relic && rarity === 'common') rarity = 'rare'; // relics are never common
+    if ((ITEMS[id].relic || ITEMS[id].keystone) && rarity === 'common') rarity = 'rare'; // relics and keystones are never common
     out.push(rollInstance(id, rarity, round, rng));
   }
   return out;
@@ -260,7 +279,7 @@ export function statLines(inst) {
     crit: (v) => `+${Math.round(v * 100)}% Crit`, haste: (v) => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}% Haste`,
     resist: (v) => `+${Math.round(v * 100)}% Resist`, lifesteal: (v) => `+${Math.round(v * 100)}% Lifesteal`,
     evasion: (v) => `+${Math.round(v * 100)}% Evasion`, critDmg: (v) => `+${Math.round(v * 100)}% Crit dmg`,
-    thorns: (v) => `+${v} Thorns`, pen: (v) => `Pierce ${v}` };
+    thorns: (v) => `+${v} Thorns`, pen: (v) => `Pierce ${v}`, regen: (v) => `Regen ${v}/s` };
   for (const k of Object.keys(fmt)) if (st[k]) lines.push(fmt[k](st[k]));
   for (const oh of st.statusOnHit) lines.push(`+${Math.round(oh.chance * 100)}% ${cap(oh.apply)} on hit`);
   for (const [k, v] of Object.entries(def.mods?.vs || {})) lines.push(`+${Math.round(v * 100)}% dmg vs ${cap(k)}`);

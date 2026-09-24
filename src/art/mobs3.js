@@ -36,6 +36,15 @@ const R = {
   penguin: ['#6a7a9c', '#3a4a6e', '#252f48', '#141a2e'],
   wolf: ['#f4f8ff', '#c8d4ea', '#8a9cc0', '#4e5e84'],
   fur: ['#ffffff', '#e8eef8', '#b8c4dc', '#7a86a8'],
+  toad: ['#c8e890', '#86b050', '#50782e', '#2e4a1e'],
+  leech: ['#c89aa8', '#8a5068', '#5a2e44', '#341a2a'],
+  mud: ['#b0946a', '#7e6440', '#56422a', '#34281a'],
+  croc: ['#a8c078', '#6a8a48', '#44602e', '#283a1c'],
+  hag: ['#b8d890', '#7ea860', '#50783e', '#2e4a24'],
+  night: ['#8a7ae8', '#5a4ab8', '#3a2e80', '#221a50'],
+  star: ['#ffffff', '#fff6c8', '#ffd36b', '#e0a52e'],
+  rock: ['#a8a0b8', '#78708a', '#50485e', '#2e2a3a'],
+  moth: ['#ffe0b0', '#f5a860', '#d0703a', '#8a3a1e'],
 };
 
 const eye = (p, x, y, iris = 'o', glint = 'w') => { p.px(x, y, glint); p.px(x + 1, y, iris); p.px(x, y + 1, iris); p.px(x + 1, y + 1, iris); };
@@ -495,10 +504,235 @@ function frostwyrm() {
   return p;
 }
 
+// ================================================================ Mirebog Swamp
+
+function toad() {
+  const p = new Painter();
+  // back legs folded
+  p.ellipse(22, 25, 6, 4, R.toad);
+  p.rect(20, 28, 8, 2, R.toad[2]);
+  // body
+  p.ellipse(15, 21, 11, 8, R.toad);
+  p.ellipse(12, 24, 6, 4, ['#fff8d8', '#f2e8b0', '#d8c888', '#a89860']);
+  // warts
+  for (const [x, y] of [[18, 16], [22, 19], [15, 14]]) p.ellipse(x, y, 1.3, 1.1, R.toad);
+  // eyes on top
+  p.ellipse(8, 13, 3, 3, R.toad); p.ellipse(15, 12, 3, 3, R.toad);
+  eye(p, 7, 12, '#1a1423', '#fff27a'); eye(p, 14, 11, '#1a1423', '#fff27a');
+  // wide mouth
+  p.line(4, 19, 12, 20, R.toad[3]);
+  // front feet
+  p.rect(6, 28, 4, 2, R.toad[2]);
+  // poison drip
+  p.stamp(['g', 'g', '.', 'g'], 3, 20, { g: '#9ee06a' });
+  return p;
+}
+
+function leech() {
+  const p = new Painter();
+  // segmented body curling up, mouth to the left
+  const seg = [[26, 25], [22, 23], [18, 21], [14, 18], [10, 15], [7, 12]];
+  seg.forEach(([x, y], i) => p.ellipse(x, y, 4.5 - i * 0.2, 4 - i * 0.2, R.leech));
+  for (const [x, y] of seg) p.px(x, y - 2, R.leech[0]);
+  // round sucker mouth with teeth
+  p.ellipse(5, 10, 3.2, 3.2, ['#8a3a4a', '#6e1a2e', '#4a0e1e', '#2a0612']);
+  for (const [x, y] of [[4, 8], [6, 8], [3, 10], [7, 11]]) p.px(x, y, 'w');
+  // drip of blood
+  p.stamp(['r', 'r', '.', 'r'], 5, 14, { r: '#d9434f' });
+  return p;
+}
+
+function mudgolem() {
+  const p = new Painter();
+  // legs
+  p.ellipse(11, 27, 4, 3, R.mud); p.ellipse(22, 27, 4, 3, R.mud);
+  // lumpy body
+  p.ellipse(16, 17, 11, 10, R.mud);
+  p.ellipse(8, 11, 4, 3, R.mud); p.ellipse(24, 10, 4, 3, R.mud);
+  // arms
+  p.ellipse(4, 20, 3.5, 5, R.mud); p.ellipse(28, 20, 3.5, 5, R.mud);
+  // moss and mushrooms on top
+  p.rect(10, 7, 12, 2, '#5fa84a');
+  p.stamp(['.r.', 'rrr', '.s.'], 19, 3, { r: '#d9434f', s: '#f1d9b5' });
+  // face: two glowing holes and a mouth
+  p.rect(10, 14, 3, 2, '#1a1410'); p.rect(17, 14, 3, 2, '#1a1410');
+  p.px(11, 14, '#9ee06a'); p.px(18, 14, '#9ee06a');
+  p.rect(11, 19, 8, 2, '#1a1410');
+  // drips
+  for (const x of [9, 15, 22]) p.line(x, 26, x, 28, R.mud[2]);
+  return p;
+}
+
+function gnats() {
+  const p = new Painter();
+  // a cloud of little biters
+  const pts = [[8, 10], [15, 6], [22, 9], [12, 15], [19, 14], [26, 16], [7, 20], [14, 22], [21, 21], [16, 27], [25, 25], [10, 26]];
+  for (const [x, y] of pts) {
+    p.ellipse(x, y, 2, 1.6, R.leech);
+    p.px(x - 1, y - 2, '#e6f4ff'); p.px(x + 1, y - 2, '#e6f4ff');
+    p.px(x - 2, y, '#ff4a5a');
+  }
+  // faint swarm haze
+  for (let i = 0; i < 18; i++) p.px(4 + ((i * 7) % 24), 4 + ((i * 11) % 24), '#8a5068');
+  return p;
+}
+
+function croc() {
+  const p = new Painter();
+  // tail
+  p.poly([[24, 22], [31, 18], [31, 22], [26, 26]], R.croc[2]);
+  // legs
+  for (const x of [10, 20]) { p.line(x, 25, x - 2, 30, R.croc[3], 3); p.line(x + 4, 25, x + 5, 30, R.croc[3], 3); }
+  // body with ridged back
+  p.ellipse(17, 22, 10, 5, R.croc);
+  for (let x = 10; x <= 26; x += 3) p.poly([[x - 1, 18], [x, 15], [x + 1, 18]], R.croc[3]);
+  // long snout open
+  p.ellipse(8, 18, 5, 3.5, R.croc);
+  p.poly([[0, 15], [7, 16], [7, 18], [0, 17]], R.croc[1]);
+  p.poly([[0, 20], [7, 19], [7, 21], [1, 22]], R.croc[2]);
+  for (const x of [1, 3, 5]) { p.px(x, 17, 'w'); p.px(x + 1, 19, 'w'); }
+  eye(p, 8, 15, '#1a1423', '#fff27a');
+  return p;
+}
+
+function bogmother() {
+  const p = new Painter();
+  // mossy robe spreading into the mud
+  p.poly([[8, 12], [24, 12], [30, 30], [2, 30]], R.hag[2]);
+  p.poly([[8, 12], [14, 12], [8, 30], [2, 30]], R.hag[1]);
+  for (let x = 3; x <= 29; x += 4) p.line(x, 30, x + 1, 27, '#5fa84a');
+  // arm raising a staff topped with a bubbling skull
+  p.line(4, 30, 3, 6, '#5a3a20', 2);
+  p.ellipse(3, 5, 3, 2.6, ['#ffffff', '#efe6cf', '#c8bb98', '#8a7c62']);
+  p.stamp(['g.g', '.g.'], 1, 0, { g: '#9ee06a' });
+  // head with a hood of reeds
+  p.ellipse(16, 9, 5, 5, R.hag);
+  p.poly([[10, 8], [16, 1], [22, 8]], '#3e5428');
+  eye(p, 13, 8, '#fff27a', 'w'); eye(p, 17, 8, '#fff27a', 'w');
+  p.rect(14, 12, 4, 1, '#2e4a24');
+  return p;
+}
+
+// ================================================================ Starfall Observatory
+
+function starling() {
+  const p = new Painter();
+  // a little five-pointed star with a face and a sparkly trail
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 ? 5 : 11;
+    pts.push([15 + Math.cos(a) * r, 16 + Math.sin(a) * r]);
+  }
+  p.poly(pts, R.star[2]);
+  p.ellipse(15, 16, 6, 6, R.star);
+  eye(p, 12, 15, 'o', 'w'); eye(p, 16, 15, 'o', 'w');
+  p.px(14, 19, '#f28bb0'); p.px(15, 19, '#f28bb0');
+  for (const [x, y] of [[27, 22], [29, 26], [25, 28], [30, 19]]) p.px(x, y, '#c8c0ff');
+  return p;
+}
+
+function meteorite() {
+  const p = new Painter();
+  // flame trail up and behind
+  p.poly([[16, 10], [31, 0], [26, 12], [30, 18], [20, 18]], '#f5803a');
+  p.poly([[18, 12], [28, 4], [24, 14]], '#ffc84a');
+  // rock body
+  p.ellipse(14, 20, 10, 9, R.rock);
+  for (const [x, y] of [[10, 16], [18, 22], [12, 25]]) p.ellipse(x, y, 2, 1.6, ['#50485e', '#3a3448', '#2e2a3a', '#1e1a28']);
+  // glowing cracks
+  p.line(6, 20, 11, 22, '#ffc84a'); p.line(16, 14, 20, 18, '#f5803a');
+  // angry eyes
+  p.rect(7, 17, 3, 2, '#fff27a'); p.rect(13, 17, 3, 2, '#fff27a');
+  p.line(6, 15, 10, 16, R.rock[3]); p.line(13, 16, 17, 15, R.rock[3]);
+  return p;
+}
+
+function orrery() {
+  const p = new Painter();
+  // brass stand
+  p.rect(14, 22, 4, 6, '#b8862b'); p.rect(9, 28, 14, 3, '#8f6424'); p.rect(9, 28, 14, 1, '#eac25c');
+  // rings around a core
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    p.px(16 + Math.cos(a) * 13, 13 + Math.sin(a) * 4, '#eac25c');
+    p.px(16 + Math.cos(a) * 5, 13 + Math.sin(a) * 11, '#b8862b');
+  }
+  p.ellipse(16, 13, 5, 5, R.night);
+  eye(p, 14, 12, '#1a1423', '#fff27a');
+  // planets on the rings
+  p.ellipse(3, 13, 2.4, 2.4, R.star); p.ellipse(29, 12, 2, 2, ['#ffb0c0', '#e8506e', '#b02e4e', '#6e1a34']);
+  p.ellipse(16, 2, 1.8, 1.8, ['#d0fff6', '#74e0d0', '#2fa8a8', '#1c6a78']);
+  return p;
+}
+
+function moth() {
+  const p = new Painter();
+  // big glowing wings
+  p.ellipse(9, 12, 8, 7, R.moth); p.ellipse(23, 12, 8, 7, R.moth);
+  p.ellipse(10, 22, 5, 4, R.moth); p.ellipse(22, 22, 5, 4, R.moth);
+  for (const [x, y] of [[8, 11], [24, 11]]) { p.ellipse(x, y, 2.5, 2.5, R.star); p.px(x, y, '#d0703a'); }
+  // fuzzy body
+  p.ellipse(16, 17, 3, 8, ['#fff8e8', '#e8d8b8', '#b8a080', '#7a6448']);
+  // head and feathery antennae
+  p.ellipse(16, 8, 3, 2.6, ['#fff8e8', '#e8d8b8', '#b8a080', '#7a6448']);
+  p.line(15, 6, 11, 1, '#b8a080'); p.line(17, 6, 21, 1, '#b8a080');
+  eye(p, 14, 7, '#1a1423', '#ffc84a');
+  // embers
+  p.stamp(['y.', '.f'], 2, 26, { y: '#fff27a', f: '#f58a3a' }); p.stamp(['f', '.', 'y'], 29, 24, { y: '#fff27a', f: '#f58a3a' });
+  return p;
+}
+
+function astromancer() {
+  const p = new Painter();
+  // starry robe
+  p.poly([[10, 12], [22, 12], [27, 30], [5, 30]], R.night[2]);
+  p.poly([[10, 12], [15, 12], [10, 30], [5, 30]], R.night[1]);
+  for (const [x, y] of [[9, 20], [18, 17], [22, 25], [13, 27], [20, 29]]) p.px(x, y, '#fff6c8');
+  // staff with a star, held forward
+  p.line(4, 30, 5, 8, '#b8862b', 2);
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    pts.push([5 + Math.cos(a) * (i % 2 ? 2 : 4.5), 6 + Math.sin(a) * (i % 2 ? 2 : 4.5)]);
+  }
+  p.poly(pts, '#ffd36b');
+  // pointed hat with a moon
+  p.poly([[10, 9], [16, -1], [23, 9]], R.night[1]);
+  p.rect(9, 9, 15, 2, R.night[3]);
+  p.stamp(['.y', 'y.', '.y'], 16, 3, { y: '#fff6c8' });
+  // face in shadow, glowing eyes, long beard
+  p.ellipse(16, 13, 4, 3, ['#f0e0d0', '#d8c0a8', '#a88870', '#6a5040']);
+  p.px(14, 12, '#8fd8f0'); p.px(17, 12, '#8fd8f0');
+  p.poly([[13, 15], [19, 15], [16, 23]], '#efe6cf');
+  return p;
+}
+
+function meteorgolem() {
+  const p = new Painter();
+  // legs
+  p.ellipse(10, 28, 5, 3, R.rock); p.ellipse(22, 28, 5, 3, R.rock);
+  // huge craggy body
+  p.ellipse(16, 16, 12, 12, R.rock);
+  // magma cracks
+  p.line(9, 8, 13, 16, '#f5803a'); p.line(13, 16, 11, 24, '#f5803a');
+  p.line(20, 10, 23, 20, '#ffc84a'); p.line(18, 20, 22, 26, '#f5803a');
+  // fists
+  p.ellipse(3, 18, 4, 5, R.rock); p.ellipse(29, 19, 3.5, 4.5, R.rock);
+  p.stamp(['f.f', '.f.'], 1, 16, { f: '#ffc84a' });
+  // burning crown
+  for (const [x, h] of [[11, 5], [16, 7], [21, 5]]) p.poly([[x - 2, 6], [x, 6 - h], [x + 2, 6]], '#f5803a');
+  // eyes
+  p.rect(10, 12, 4, 2, '#fff27a'); p.rect(17, 12, 4, 2, '#fff27a');
+  return p;
+}
+
 // Some builders use '.' to punch holes; nothing else needs cleaning here.
 export const NEW_MOBS = {
   shroomknight, puffer, hound, pumpkin, salamander,
   skink, beetle, scorpion, mummy, sandwyrm, sphinx,
   sprout, bee, hedgehog, bear, treant, waspqueen,
   snowpuff, penguin, wolf, yeti, abominable, frostwyrm,
+  toad, leech, mudgolem, gnats, croc, bogmother,
+  starling, meteorite, orrery, moth, astromancer, meteorgolem,
 };

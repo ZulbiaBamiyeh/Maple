@@ -34,6 +34,8 @@ const R = {
   leaf: ['#d0f5a0', '#86c860', '#4e9440', '#2e5e2a'],
   honey: ['#fff4a0', '#ffd23a', '#e0a020', '#8a5a10'],
   ice: ['#ffffff', '#c8f4ff', '#7fd0ec', '#3a8ac0'],
+  bog: ['#d8f0a0', '#a8c870', '#6a8a42', '#3e5428'],
+  astral: ['#ffffff', '#c8c0ff', '#8a7ae8', '#3e3494'],
 };
 const H = (r) => r[0], L = (r) => r[1], M = (r) => r[2], D = (r) => r[3];
 
@@ -317,6 +319,32 @@ const PAINT = {
     p.poly([[1.5, 7], [8, 7], [8, 15]], L(R.ice));
     for (let a = 0; a < 3; a++) { const t = (a / 3) * Math.PI; p.line(8 - Math.cos(t) * 3, 8 - Math.sin(t) * 3, 8 + Math.cos(t) * 3, 8 + Math.sin(t) * 3, 'w'); }
     p.px(4, 4, 'w');
+  },
+
+  // Swamp and Observatory
+  t_bubble(p) {
+    p.ellipse(8, 9, 6, 6, R.bog);
+    p.ellipse(5, 6, 1.6, 1.6, ['#ffffff', '#ffffff', '#e8ffe0', '#c8f0b0']);
+    p.ellipse(11, 12, 1.4, 1.2, R.poison);
+    p.ellipse(4, 2, 1.6, 1.6, R.bog); p.ellipse(12, 3, 1.1, 1.1, R.bog);
+  },
+  t_bloodpearl(p) {
+    p.poly([[2, 11], [14, 11], [12, 14], [4, 14]], M(R.shell));
+    p.rect(4, 11, 8, 1, L(R.shell));
+    p.ellipse(8, 7, 4.6, 4.6, R.blood);
+    p.px(6, 5, 'w'); p.px(7, 5, H(R.blood));
+  },
+  t_chart(p) {
+    p.rect(2, 2, 12, 12, D(R.astral)); p.rect(3, 3, 10, 10, M(R.astral));
+    for (const [x, y] of [[5, 5], [10, 4], [8, 8], [11, 11], [5, 11]]) p.px(x, y, 'w');
+    p.line(5, 5, 8, 8, L(R.astral)); p.line(8, 8, 11, 11, L(R.astral)); p.line(8, 8, 10, 4, L(R.astral));
+    p.rect(2, 2, 12, 1, H(R.astral));
+  },
+  t_stardust(p) {
+    p.rect(6, 1, 4, 2, M(R.wood)); p.rect(6, 1, 4, 1, L(R.wood));
+    p.ellipse(8, 10, 5, 5, R.glass);
+    p.ellipse(8, 11, 3.6, 3, R.ember);
+    for (const [x, y] of [[6, 10], [9, 12], [10, 9]]) p.px(x, y, 'w');
   },
 };
 

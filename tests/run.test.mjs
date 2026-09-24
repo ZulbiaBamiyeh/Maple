@@ -3,7 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Run } from '../src/game.js';
-import { MOBS, ITEMS, BIOMES, BIOME, CLASSIC_ORDER, MOB_POWER, DAYS_IN_RUN, BAG_SIZE, LIVES, ROUNDS, DUEL_ROUNDS } from '../src/data.js';
+import { MOBS, ITEMS, BIOMES, BIOME, CLASSIC_ORDER, MOB_POWER, DAYS_IN_RUN, BAG_SIZE, LIVES, ROUNDS, DUEL_ROUNDS, WIN_TARGET, SHOP_AFTER_DAYS, KEYSTONES, FAMILIES } from '../src/data.js';
+import { rollInstance, heroFighter } from '../src/items.js';
+import { simulate } from '../src/sim.js';
+import { EVENTS, EVENTS_PER_RUN, planEvents, eventOptions, chooseEvent } from '../src/events.js';
+import { playRun, smart } from '../tools/bots.mjs';
 
 // A simple player: mostly easy hunts, equips drops that help, bags or leaves the rest.
 function play(run, step) {
@@ -35,14 +39,18 @@ function invariants(run) {
 }
 
 test('full runs finish on many seeds without breaking invariants', () => {
-  let crowns = 0;
   for (let seed = 1; seed <= 60; seed++) {
     const run = play(new Run(seed), invariants);
     assert.ok(run.over, `seed ${seed} never ended`);
-    assert.ok(run.lives === 0 || run.round === ROUNDS, `seed ${seed} ended early with lives left`);
-    if (run.crown) crowns++;
+    assert.ok(run.lives === 0 || run.crown || run.round === ROUNDS, `seed ${seed} ended early with lives left and no Crown`);
+    if (run.crown) assert.equal(run.duelWins, WIN_TARGET);
     assert.equal(run.history.length, run.wins + run.losses + run.history.filter((h) => h.result === 'D').length);
   }
+});
+
+test('a careful player can win the Crown', () => {
+  let crowns = 0;
+  for (let seed = 1; seed <= 12 && !crowns; seed++) if (playRun(seed * 31, smart).crown) crowns++;
   assert.ok(crowns > 0, 'nobody ever won a Crown');
 });
 
@@ -201,6 +209,137 @@ test('every biome has monsters for every tier, and every monster has power for e
     for (const id of Object.values(b.tiers).flat()) {
       assert.equal(MOB_POWER[id]?.length, DAYS_IN_RUN, `${id} has no power table`);
       for (const drop of MOBS[id].drops) assert.ok(ITEMS[drop], `${id} drops unknown ${drop}`);
+    }
+  }
+});
+
+test('the Crown comes from duel wins, and the merchant opens after the right duels', () => {
+  let shops = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const run = new Run(seed);
+    let guard = 0;
+    while (!run.over && guard++ < 50) {
+      run.fight(run.isDuel ? undefined : run.offers.find((m) => MOBS[m].tier === 'easy'));
+      const out = run.resolve();
+      if (out.shop) {
+        shops++;
+        assert.ok(SHOP_AFTER_DAYS.includes(run.day), `shop on day ${run.day}`);
+        assert.equal(run.shop.length, 5);
+        // buying spends gold and places the item
+        const w = run.shop.findIndex((x) => x.price <= run.gold);
+        if (w >= 0 && !run.bagFull()) {
+          const g = run.gold;
+          assert.ok(run.buy(w, 'bag'));
+          assert.equal(run.gold, g - run.shop[w].price);
+          assert.ok(run.bag.includes(run.shop[w].inst));
+        }
+        run.leaveShop();
+      }
+      while (run.loot) run.takeLoot(run.loot[0], run.bagFull() ? 'discard' : 'bag');
+      if (!run.over) run.next();
+    }
+    assert.ok(run.duelWins <= WIN_TARGET);
+    assert.equal(run.crown, run.duelWins >= WIN_TARGET);
+    assert.ok(run.gold >= 0);
+  }
+  assert.ok(shops > 0, 'the merchant never showed up');
+});
+
+test('two identical items merge one rarity up with a perk', () => {
+  const run = new Run(9);
+  const a = rollInstance('jelly_sabre', 'common', 4, run.rng);
+  const b = rollInstance('jelly_sabre', 'common', 6, run.rng);
+  run.equip.weapon = a;
+  run.bag.push(b);
+  assert.equal(run.twinOf(a), b);
+  const m = run.merge(a.uid);
+  assert.equal(m.rarity, 'rare');
+  assert.equal(m.round, 6);
+  assert.ok(m.perks.length >= 1);
+  assert.equal(run.equip.weapon, m, 'the merged item stays equipped');
+  assert.equal(run.bag.length, 0);
+  // epics and relics don't merge
+  const e1 = rollInstance('jelly_sabre', 'epic', 4, run.rng);
+  run.bag.push(e1, rollInstance('jelly_sabre', 'epic', 4, run.rng));
+  assert.equal(run.twinOf(e1), null);
+});
+
+test('every family reaches four pieces, and full sets and keystones change fights', () => {
+  for (const [fam, f] of Object.entries(FAMILIES)) {
+    if (fam === 'stasis') continue;
+    assert.ok(f.set4, `${fam} has no 4-piece bonus`);
+    const items = Object.keys(ITEMS).filter((id) => ITEMS[id].family === fam);
+    const kinds = new Set(items.map((id) => ITEMS[id].slot).filter((s) => s !== 'trinket'));
+    const trinkets = items.filter((id) => ITEMS[id].slot === 'trinket').length;
+    assert.ok(kinds.size + Math.min(2, trinkets) >= 4, `${fam} can't reach 4 pieces`);
+  }
+  assert.equal(KEYSTONES.length, BIOMES.length, 'one keystone per biome');
+  for (const id of KEYSTONES) {
+    assert.ok(Object.values(MOBS).some((m) => m.drops.includes(id)), `${id} drops nowhere`);
+    const r = new Run(4).rng;
+    const base = { name: 'x', round: 12, equip: { weapon: rollInstance('spore_shiv', 'rare', 12, r), top: rollInstance('linen_shirt', 'rare', 12, r) } };
+    const slot = ITEMS[id].slot === 'trinket' ? 'trinket1' : ITEMS[id].slot;
+    const withKey = { ...base, equip: { ...base.equip, [slot]: rollInstance(id, 'rare', 12, r) } };
+    const foe = heroFighter({ name: 'y', round: 12, equip: { weapon: rollInstance('tusk_cleaver', 'rare', 12, r), top: rollInstance('reef_mail', 'rare', 12, r) } });
+    const f = heroFighter(withKey);
+    assert.ok(Object.keys(f.sets).length, `${id} sets no flag`);
+    // the fight runs and ends
+    const res = simulate(f, foe, 5);
+    assert.ok([0, 1, -1].includes(res.winner));
+  }
+});
+
+test('each run plans four different events on hunt rounds', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    const plan = planEvents(seed);
+    assert.equal(plan.length, EVENTS_PER_RUN);
+    assert.equal(new Set(plan.map((e) => e.id)).size, EVENTS_PER_RUN);
+    for (const e of plan) {
+      assert.ok(e.round > 1 && e.round <= ROUNDS && !DUEL_ROUNDS.includes(e.round), `seed ${seed}: event on round ${e.round}`);
+      assert.ok(EVENTS[e.id]);
+    }
+  }
+  // it actually fires in play
+  const run = new Run(3);
+  const first = run.eventPlan[0];
+  let fired = false;
+  while (!run.over && run.round <= first.round) {
+    run.fight(run.isDuel ? undefined : run.offers[0]);
+    const out = run.resolve();
+    if (out.event) { fired = true; assert.equal(run.event.id, first.id); break; }
+    while (run.loot) run.takeLoot(run.loot[0], run.bagFull() ? 'discard' : 'bag');
+    if (run.shop) run.leaveShop();
+    run.next();
+  }
+  assert.ok(fired || run.over, 'the first planned event never fired');
+});
+
+test('every event option applies and leaves the run consistent', () => {
+  for (const id of Object.keys(EVENTS)) {
+    const probe = new Run(11);
+    probe.event = { id, round: 6, result: null };
+    for (const opt of eventOptions(probe)) {
+      if (opt.key === 'leave') continue;
+      const run = new Run(11);
+      run.round = 6;
+      run.gold = 30;
+      run.bag.push(rollInstance('reef_mail', 'rare', 5, run.rng), rollInstance('spore_hood', 'common', 5, run.rng));
+      run.equip.hat = rollInstance('shell_helm', 'rare', 5, run.rng); // a coral piece so the tailor has a family
+      run.event = { id, round: 6, result: null };
+      const o = eventOptions(run).find((x) => x.key === opt.key);
+      if (o.disabled) continue;
+      const pick = o.pick ? [...run.bag, ...Object.values(run.equip)].find((i) => i && o.pick(i)) : null;
+      if (o.pick && !pick) continue;
+      const res = chooseEvent(run, o.key, pick?.uid);
+      assert.ok(res && res.text, `${id}:${o.key} gave no outcome`);
+      assert.ok(run.gold >= 0, `${id}:${o.key} made gold negative`);
+      assert.ok(run.lives >= 1);
+      assert.ok(run.bag.length <= BAG_SIZE, `${id}:${o.key} overfilled the bag`);
+      const uids = [...run.bag, ...Object.values(run.equip)].filter(Boolean).map((i) => i.uid);
+      assert.equal(new Set(uids).size, uids.length, `${id}:${o.key} duplicated an item`);
+      if (res.gained) assert.ok(run.find(res.gained), `${id}:${o.key} gained item is nowhere`);
+      if (['demon:brand', 'shrine:echo'].includes(`${id}:${o.key}`)) assert.ok(run.boons.hpMult < 1, 'the curse did nothing');
+      assert.equal(chooseEvent(run, o.key, pick?.uid), null, 'an event can only be taken once');
     }
   }
 });

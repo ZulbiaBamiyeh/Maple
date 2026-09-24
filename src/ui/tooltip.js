@@ -17,12 +17,13 @@ function card(inst, fromTable) {
   const rar = fromTable ? '' : `${RARITIES[inst.rarity].name} `;
   const lines = statLines(inst).map((l) => `<li class="${l.startsWith('✦') ? 'perk' : ''}">${l}</li>`).join('');
   return `
-    <div class="tt-nm rc-${fromTable ? 'common' : inst.rarity}">${it.relic ? '<span class="relic-tag">RELIC</span> ' : ''}${it.name}</div>
+    <div class="tt-nm rc-${fromTable ? 'common' : inst.rarity}">${it.relic ? '<span class="relic-tag">RELIC</span> ' : it.keystone ? '<span class="key-tag">KEYSTONE</span> ' : ''}${it.name}</div>
     <div class="tt-meta">${rar}${kind(it)}${fam ? ` · ${fam.name}` : ''}</div>
     <ul class="tt-lines">${lines}</ul>
     ${fam ? `<div class="tt-set"><b>${fam.set.name}</b> (2): ${fam.set.desc}</div>` : ''}
+    ${fam?.set4 ? `<div class="tt-set"><b>${fam.set.name}</b> (4): ${fam.set4.desc}</div>` : ''}
     ${it.flavor ? `<div class="tt-flavor">${it.flavor}</div>` : ''}
-    ${fromTable ? `<div class="tt-flavor">${it.relic ? 'Drops Rare or Epic.' : 'Drops at any rarity.'} Numbers grow with the day.</div>` : ''}`;
+    ${fromTable ? `<div class="tt-flavor">${it.relic || it.keystone ? 'Drops Rare or Epic.' : 'Drops at any rarity.'}</div>` : ''}`;
 }
 
 // Set bonuses, statuses and stat names get small explainer cards.
@@ -30,8 +31,9 @@ function setCard(fam) {
   const f = FAMILIES[fam];
   const from = Object.values(MOBS).filter((m) => m.family === fam).map((m) => m.name);
   return `<div class="tt-nm" style="color:#c6f5a8">${f.set.name}</div>
-    <div class="tt-meta">Set bonus · wear 2 ${f.name} pieces</div>
-    <div class="tt-body">${f.set.desc}</div>
+    <div class="tt-meta">Set bonus · ${f.name} pieces</div>
+    <div class="tt-body"><b>2:</b> ${f.set.desc}</div>
+    ${f.set4 ? `<div class="tt-body"><b>4:</b> ${f.set4.desc}</div>` : ''}
     ${from.length ? `<div class="tt-flavor">Dropped by ${from.join(', ')}.</div>` : ''}`;
 }
 function statusCard(id) {

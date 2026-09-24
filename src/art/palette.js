@@ -63,6 +63,10 @@ export const RAMPS = {
   honey: ['#ffe98a', '#f5b82e', '#a8701a'],
   yeti: ['#ffffff', '#dfe6f2', '#9aa6c0'],
   rime: ['#e6fbff', '#8fd8f0', '#3f8fc0'],
+  bog: ['#a8c870', '#6a8a42', '#3e5428'],
+  blood: ['#ff8a9a', '#c8324a', '#6e1a2e'],
+  astral: ['#e8e0ff', '#8a7ae8', '#3e3494'],
+  comet: ['#ffd8a0', '#e8804a', '#8a3a2a'],
   // default outfits under the armour
   under_girl: ['#fde7ef', '#f6b8cc', '#d4829d'],
   under_boy: ['#e6f0ff', '#a9c1e6', '#6f89b8'],
