@@ -1,6 +1,6 @@
 // Shared UI pieces: sprite images, item tiles, the HUD, the bottom sheet, toasts.
 
-import { gridToCanvas, silhouette } from '../art/pixel.js';
+import { gridToCanvas, silhouette, squash } from '../art/pixel.js';
 import { heroGrid, HERO_W, HERO_H } from '../art/hero.js';
 import { iconGrid, ICON_SIZE } from '../art/icons.js';
 import { mobGrid, MOB_SIZE } from '../art/mobs.js';
@@ -26,18 +26,24 @@ const lookKey = (l) => [l.gender, l.hair, l.hairColor, l.skin, l.eyes].join(',')
 // shadow: draw only the bare body's outline, for a rival whose build is hidden.
 export function heroImg(look, equip, scale = 4, { flip = false, cls = 'hero', shadow = false } = {}) {
   const ids = shadow ? {} : equipIds(equip);
-  const src = shadow
-    ? dataUrl('s' + lookKey(look), () => silhouette(heroGrid(look, {}, 'idle'), '#0f0b16'))
-    : dataUrl('h' + lookKey(look) + JSON.stringify(ids), () => heroGrid(look, ids, 'idle'));
-  return `<img class="px ${cls}" src="${src}" width="${HERO_W * scale}" height="${HERO_H * scale}" style="${flip ? 'transform:scaleX(-1)' : ''}" alt="">`;
+  const key = lookKey(look) + JSON.stringify(ids);
+  const frame = (breath) => (shadow
+    ? dataUrl(`s${breath ? 'b' : ''}` + lookKey(look), () => silhouette(heroGrid(look, {}, 'idle', breath), '#0f0b16'))
+    : dataUrl(`h${breath ? 'b' : ''}` + key, () => heroGrid(look, ids, 'idle', breath)));
+  return sprite(cls, frame(false), frame(true), HERO_W * scale, HERO_H * scale, flip);
+}
+// Two idle frames stacked in one box; CSS flips between them (see .spr).
+function sprite(cls, a, b, w, h, flip = false) {
+  return `<span class="spr ${cls}" style="${flip ? 'transform:scaleX(-1)' : ''}"><img class="px f1" src="${a}" width="${w}" height="${h}" alt=""><img class="px f2" src="${b}" width="${w}" height="${h}" alt=""></span>`;
 }
 export function iconImg(itemId, scale = 2) {
   const src = dataUrl('i' + itemId, () => iconGrid(itemId));
   return `<img class="px" src="${src}" width="${ICON_SIZE * scale}" height="${ICON_SIZE * scale}" alt="">`;
 }
-export function mobImg(sprite, scale = 3) {
-  const src = dataUrl('m' + sprite, () => mobGrid(sprite));
-  return `<img class="px mob" src="${src}" width="${MOB_SIZE * scale}" height="${MOB_SIZE * scale}" alt="">`;
+export function mobImg(name, scale = 3) {
+  const a = dataUrl('m' + name, () => mobGrid(name));
+  const b = dataUrl('mb' + name, () => squash(mobGrid(name)));
+  return sprite('mob', a, b, MOB_SIZE * scale, MOB_SIZE * scale);
 }
 export function glyph(name, scale = 2) {
   const g = glyphGrid(name);

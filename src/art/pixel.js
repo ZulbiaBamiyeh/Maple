@@ -141,3 +141,18 @@ export function silhouette(g, color = '#ffffff') {
   for (let i = 0; i < g.px.length; i++) if (g.px[i]) s.px[i] = color;
   return s;
 }
+
+// A monster's second idle frame: drop one row through the middle of the body so
+// everything above it sinks a pixel while the feet stay put.
+export function squash(grid, at = 0.55) {
+  let top = grid.h, bottom = -1;
+  for (let y = 0; y < grid.h; y++) for (let x = 0; x < grid.w; x++) if (grid.get(x, y)) { top = Math.min(top, y); bottom = y; }
+  const out = new Grid(grid.w, grid.h);
+  if (bottom < 0) return out;
+  const pivot = top + Math.round((bottom - top) * at);
+  for (let y = 0; y < grid.h; y++) {
+    const src = y <= pivot ? y - 1 : y;
+    for (let x = 0; x < grid.w; x++) out.set(x, y, src >= 0 ? grid.get(x, src) : null);
+  }
+  return out;
+}

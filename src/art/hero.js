@@ -377,11 +377,11 @@ const HATS = {
     '.99999999999999999.',
   ],
   horned: [
-    'T..................',
-    'TU.................',
-    '.TU....7777.....TU.',
-    '.TUU.77778888..TU..',
-    '..TUU7778888888UV..',
+    'T.................T',
+    'TU...............UT',
+    '.TU....7777.....UT.',
+    '.TUU.77778888..UUT.',
+    '..TUU7778888888UUT.',
     '..777888888888889..',
     '.77888888888888899.',
     '.TTTTUUUUUUUUUUUVV.',
@@ -488,18 +488,23 @@ function shaderFor(look) {
 }
 
 // equip: { slot: itemId }   pose: 'idle' | 'swing'
-export function heroLayers(look, equip = {}, pose = 'idle') {
+// breath: the second idle frame. Everything above the hips sinks one pixel
+// while the legs and feet stay planted.
+export function heroLayers(look, equip = {}, pose = 'idle', breath = false) {
   const base = lookMaps(look);
   const L = [];
   const style = HAIR_STYLES[look.hair] || HAIR_STYLES.long;
-  const at = (rows, x, y, map = base, opts = {}) => L.push({ rows, x: x + OX, y: y + OY, map, ...opts });
+  let planted = false;
+  const at = (rows, x, y, map = base, opts = {}) => L.push({ rows, x: x + OX, y: y + OY + (breath && !planted ? 1 : 0), map, ...opts });
 
   for (const [rows, x, y] of style.back) at(rows, x, y);
 
   // legs and feet
+  planted = true;
   at(look.gender === 'girl' ? LEGS_SKIRT : LEGS_SHORTS, LEGS_X, LEGS_Y);
   if (equip.shoes) at(SHOES_EQUIPPED, FEET_X, FEET_Y - 1, itemMap(equip.shoes, base));
   else at(SHOES, FEET_X, FEET_Y);
+  planted = false;
 
   // torso and top
   at(TORSO, TORSO_X, TORSO_Y);
@@ -516,7 +521,7 @@ export function heroLayers(look, equip = {}, pose = 'idle') {
     if (hat && rows === CROWN && !HAT_SHOWS_HAIR.has(hat)) continue;
     at(rows, x, y);
   }
-  if (hat) at(HATS[hat], 6, HAT_Y[hat] || 0, itemMap(equip.hat, base));
+  if (hat) at(HATS[hat], HAT_X[hat] ?? 7, HAT_Y[hat] || 0, itemMap(equip.hat, base));
 
   // weapon, then the front hand over its grip
   const hand = pose === 'swing' ? { x: 23, y: 19 } : { x: 21, y: 20 };
@@ -535,12 +540,14 @@ export function heroLayers(look, equip = {}, pose = 'idle') {
   return L;
 }
 
-export function heroGrid(look, equip, pose) {
-  return compose(HERO_W, HERO_H, heroLayers(look, equip, pose), { shade: shaderFor(look) });
+export function heroGrid(look, equip, pose, breath = false) {
+  return compose(HERO_W, HERO_H, heroLayers(look, equip, pose, breath), { shade: shaderFor(look) });
 }
 
 // Tall hats start above the usual line; small ones sit on top of the hair.
 const HAT_Y = { witch: -5, horned: -2, crown: -3, shell: 0, goggles: 1 };
 const HAT_SHOWS_HAIR = new Set(['crown']);
+// Most hats centre on the head at x 7; the hood's shape already carries its own offset.
+const HAT_X = { hood: 6 };
 
 SHAPE_ICONS.hat = HATS;

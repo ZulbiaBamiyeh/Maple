@@ -7,7 +7,7 @@
 // impact: flash, sparks, damage number, HP bar.
 
 import { TPS } from '../sim.js';
-import { gridToCanvas, silhouette } from '../art/pixel.js';
+import { gridToCanvas, silhouette, squash } from '../art/pixel.js';
 import { heroGrid } from '../art/hero.js';
 import { mobGrid } from '../art/mobs.js';
 import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
@@ -105,7 +105,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const idle = heroGrid(look, ids, 'idle');
     const swing = heroGrid(look, ids, 'swing');
     return {
-      idle: gridToCanvas(idle), swing: gridToCanvas(swing), grid: idle,
+      idle: gridToCanvas(idle), swing: gridToCanvas(swing), grid: idle, breath: gridToCanvas(heroGrid(look, ids, 'idle', true)),
       white: gridToCanvas(silhouette(idle)), blue: gridToCanvas(silhouette(idle, '#7fd8e8')),
       red: gridToCanvas(silhouette(idle, '#ff5a5a')), gold: gridToCanvas(silhouette(idle, '#ffd36b')),
       w: 48, h: 44, cx: 24, bottom: 41, headTop: 9, chest: 20, ...weaponInfo(equip),
@@ -117,7 +117,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const style = MOB_STYLE[m.sprite] || 'lunge';
     const color = MOB_COLOR[m.sprite] || '#f4f1ff';
     return {
-      idle: c, swing: c, grid: g, white: gridToCanvas(silhouette(g)), blue: gridToCanvas(silhouette(g, '#7fd8e8')),
+      idle: c, swing: c, grid: g, breath: gridToCanvas(squash(g)), white: gridToCanvas(silhouette(g)), blue: gridToCanvas(silhouette(g, '#7fd8e8')),
       red: gridToCanvas(silhouette(g, '#ff5a5a')), gold: gridToCanvas(silhouette(g, '#ffd36b')),
       w: 32, h: 32, cx: 16, bottom: 30, headTop: 3, chest: 13, style, color, light: '#ffffff', mob: true,
     };
@@ -393,12 +393,14 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   function drawFighter(f) {
     const intro = Math.min(1, rt / 0.45);
     const enter = reduced ? 0 : Math.round((1 - easeOut(intro)) * 50) * -f.face;
-    const breathe = f.deadAt === null ? Math.floor(rt * 1.8 + f.i * 0.5) % 2 : 0;
+    // idle breathing is a second frame (upper body down a pixel), not a bob
+    const still = (f.statuses || []).some((s) => ['stun', 'freeze', 'stasis', 'chill'].includes(s.id));
+    const breathe = f.deadAt === null && !still && !reduced ? Math.floor(rt * 1.8 + f.i * 0.5) % 2 : 0;
     const m = motion(f);
     let dy = m.dy;
     if (f.winAt !== null && rt > f.winAt && !reduced) dy -= Math.round(Math.abs(Math.sin((rt - f.winAt) * 7)) * 5);
     const x = f.x - f.cx + m.dx + enter;
-    const y = groundY - f.bottom + breathe + dy;
+    const y = groundY - f.bottom + dy;
 
     // ground shadow shrinks as the fighter leaves the ground
     if (f.deadAt === null || rt - f.deadAt < 0.3) {
@@ -429,7 +431,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
       return;
     }
 
-    draw(m.pose === 'swing' ? f.swing : f.idle);
+    draw(m.pose === 'swing' ? f.swing : breathe && !m.dx && !m.dy ? f.breath : f.idle);
     const st = new Set((f.statuses || []).map((s) => s.id));
     if (st.has('stasis')) {
       draw(f.gold, 0.7);

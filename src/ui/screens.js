@@ -39,15 +39,14 @@ function fitStages(root) {
   root.querySelectorAll('[data-stage]').forEach((el) => {
     const [biome, g, maxS] = el.dataset.stage.split(',');
     const ground = +g;
-    const img = el.querySelector('img.hero, img.mob');
+    const img = el.querySelector('.spr.hero, .spr.mob');
     const mob = img?.classList.contains('mob');
     const sw = mob ? 32 : 48;
     const sh = mob ? 31 : 42; // rows down to the feet
     const S = Math.max(1, Math.min(+maxS || 5, Math.floor((el.clientHeight * ground - 6) / sh), Math.floor(el.clientWidth / (sw + 2))));
     const groundPx = backdrop(el, biome, S, ground);
     if (!img) return;
-    img.width = sw * S;
-    img.height = (mob ? 32 : 44) * S;
+    img.querySelectorAll('img').forEach((f) => { f.width = sw * S; f.height = (mob ? 32 : 44) * S; });
     img.style.marginBottom = `${el.clientHeight - groundPx - (mob ? 2 : 3) * S}px`;
   });
 }
