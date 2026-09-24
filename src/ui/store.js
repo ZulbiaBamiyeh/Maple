@@ -2,7 +2,7 @@
 // Storage can be missing or throw (private windows, blocked site data), so
 // every call is guarded and the game works without it.
 
-const KEY = 'gearfall.v1.';
+const KEY = 'gearfall.v1.'; // the old working title; kept so existing saves still load
 
 export function load(name, fallback = null) {
   try {

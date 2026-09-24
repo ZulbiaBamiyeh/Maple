@@ -22,6 +22,13 @@ export const GLYPHS = {
   spark: ['.h...y.', '..h.y..', 'hhhyyyy', '..yhy..', '.y.y.h.', 'y..y..h', '...y...'],
   eye: ['.......', '.ppppp.', 'pwwPwwp', 'pwPPPwp', 'pwwPwwp', '.ppppp.', '.......'],
   hourglass: ['yyyyyyy', '.hyyyY.', '..hyY..', '...y...', '..hyY..', '.hyyyY.', 'yyyyyyy'],
+  sword: ['......w', '.....ws', '....ws.', '.y.ws..', '..ys...', '.byy...', 'b..y...'],
+  armor: ['ss...ss', 'swsssxs', 'swsssxs', '.swssx.', '.swssx.', '.sssxx.', '..xxx..'],
+  ward: ['...y...', '..y.y..', '.ppppp.', 'pNpppPp', 'ppppppP', '.pppPP.', '..PPP..'],
+  wing: ['......w', '....wws', '..wwwss', '.wwwss.', 'wwwss..', '.wss...', '..s....'],
+  burst: ['f..f..f', '.fyfyf.', '.yhhhy.', 'ffhhhff', '.yhhhy.', '.fyfyf.', 'f..f..f'],
+  thorn: ['e..e..e', '.eeEee.', '.eEEEe.', 'eEEEEEe', '.eEEEe.', '.eeEee.', 'e..e..e'],
+  arrow: ['....w..', '....ww.', 'bbssssw', '....ww.', '....w..'],
   paw: ['.m.m.m.', '.m.m.m.', '.......', '..mmm..', '.mmmmm.', '.mmmmm.', '..m.m..'],
 };
 

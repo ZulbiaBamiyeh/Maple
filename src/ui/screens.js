@@ -54,6 +54,29 @@ function fitStages(root) {
 
 const fmtPct = (v) => `${Math.round(v * 100)}%`;
 
+// Every stat as an icon cell; the ones this build doesn't use are dimmed.
+const STAT_CELLS = [
+  ['HP', 'heart', (f) => f.maxHp, () => false],
+  ['Atk', 'sword', (f) => f.atk, (f) => !f.atk],
+  ['Def', 'armor', (f) => f.def, (f) => !f.def],
+  ['Crit', 'star', (f) => fmtPct(f.crit), () => false],
+  ['Crit dmg', 'burst', (f) => `×${(1.5 + (f.critDmg || 0)).toFixed(1)}`, (f) => !f.critDmg],
+  ['Haste', 'bolt', (f) => fmtPct(f.haste), (f) => !f.haste],
+  ['Res', 'ward', (f) => fmtPct(f.resist), (f) => !f.resist],
+  ['Evade', 'wing', (f) => fmtPct(f.evasion || 0), (f) => !f.evasion],
+  ['Steal', 'blood', (f) => fmtPct(f.lifesteal), (f) => !f.lifesteal],
+  ['Regen', 'plus', (f) => `${f.regen}/s`, (f) => !f.regen],
+  ['Thorns', 'thorn', (f) => f.thorns || 0, (f) => !f.thorns],
+  ['Pierce', 'arrow', (f) => f.pen || 0, (f) => !f.pen],
+];
+function statCells(f, max = STAT_CELLS.length) {
+  let cells = STAT_CELLS.map((c) => [...c, c[3](f)]);
+  if (max < cells.length) cells = [...cells.filter((c) => !c[4]), ...cells.filter((c) => c[4])].slice(0, max);
+  const short = { 'Crit dmg': 'Crits' };
+  return cells.map(([k, icon, val, off]) => `
+    <div class="sc ${off(f) ? 'off' : ''}" data-tipstat="${k}">${glyph(icon, 2)}<div><b>${val(f)}</b><span>${short[k] || k}</span></div></div>`).join('');
+}
+
 // Defer heavy work (odds) until after the browser paints the screen.
 function later(fn) {
   requestAnimationFrame(() => setTimeout(fn, 0));
@@ -87,8 +110,7 @@ export function titleScreen(app, ctx) {
   const equip = sv ? sv.run.equip : ctx.starterEquip;
   app.innerHTML = `
     <section class="screen title-wrap">
-      <div class="logo">GEARFALL</div>
-      <div class="tagline">Hunt monsters. Wear what drops. Duel rival builds.</div>
+      <div class="logo" aria-label="ZereshkStory">Zereshk<span class="berry">Story</span></div>
       <div class="stage panel" data-stage="slime,0.86,5">${heroImg(look, equip, 4)}</div>
       <div class="nameplate">${glyph(look.gender === 'girl' ? 'heart' : 'swords', 2)} ${look.name}${sv ? ` <span class="num" style="font-size:12px;color:var(--muted)">R${sv.round} · ${sv.run.record}</span>` : ''}</div>
       ${ctx.best?.runs ? `<div class="bestline num">${bestLine(ctx.best)}</div>` : ''}
@@ -234,14 +256,9 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
         <div class="col">${slotTile('weapon', 'Weapon')}${slotTile('trinket1', 'Trinket')}${slotTile('trinket2', 'Trinket')}</div>
       </div>
       <div class="statpanel panel">
-        <div class="big"><span class="k" data-tipstat="DPS">DPS ${deltaBadge(prev?.dps, h.dps, (x) => x.toFixed(1))}</span><span class="v">${h.dps}</span></div>
-        <div class="big"><span class="k" data-tipstat="EHP">EHP ${deltaBadge(prev?.ehp, h.ehp, Math.round)}</span><span class="v">${h.ehp}</span></div>
-        <div class="small">
-          ${[['HP', me.maxHp], ['Atk', me.atk], ['Def', me.def], ['Crit', fmtPct(me.crit)], ['Haste', fmtPct(me.haste)], ['Res', fmtPct(me.resist)],
-    me.lifesteal && ['Steal', fmtPct(me.lifesteal)], me.regen && ['Regen', `${me.regen}/s`], me.evasion && ['Evade', fmtPct(me.evasion)],
-    me.critDmg && ['Crit dmg', `+${fmtPct(me.critDmg)}`], me.thorns && ['Thorns', me.thorns], me.pen && ['Pierce', me.pen]]
-    .filter(Boolean).map(([k, v]) => `<span data-tipstat="${k}">${k} <b>${v}</b></span>`).join('')}
-        </div>
+        <div class="big" data-tipstat="DPS">${glyph('swords', 3)}<div><span class="k">DPS ${deltaBadge(prev?.dps, h.dps, (x) => x.toFixed(1))}</span><span class="v">${h.dps}</span></div></div>
+        <div class="big" data-tipstat="EHP">${glyph('shield', 3)}<div><span class="k">EHP ${deltaBadge(prev?.ehp, h.ehp, Math.round)}</span><span class="v">${h.ehp}</span></div></div>
+        <div class="sgrid">${statCells(me, mode === 'duel' ? 8 : 12)}</div>
       </div>
       <div class="bagpanel panel">
         <div class="baghead"><span>BAG ${run.bag.length}/${BAG_SIZE}</span><span class="sets">${setChips}</span></div>

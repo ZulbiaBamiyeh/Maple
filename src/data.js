@@ -46,7 +46,7 @@ export const STAT_HELP = {
   Steal: 'Lifesteal: heals you for a share of damage dealt.',
   Regen: 'Heals this much every second.',
   Evade: 'Evasion: chance to dodge a weapon hit entirely (max 40%).',
-  'Crit dmg': 'Extra damage on crits, on top of 150%.',
+  'Crit dmg': 'How hard crits hit, as extra damage on top of a normal hit (base +50%).',
   Thorns: 'Damage dealt back to anyone who hits you.',
   Pierce: 'Ignores that much of the target\'s Def.',
 };

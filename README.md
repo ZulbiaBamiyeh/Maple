@@ -1,4 +1,6 @@
-# Gearfall
+# ZereshkStory
+
+*(Working title in the design manuscript: Gearfall.)*
 
 A phone auto-battler about loot. Choose which monster to hunt, equip what it drops, then pit your build against other players' builds in short, fair duels.
 
@@ -38,6 +40,7 @@ node tools/balance.mjs 300    # bot runs: win rates per tier and duel, Crown rat
 | **Saving** | The run auto-saves on this device, and the title screen offers Continue. A fight's result is locked in before it plays, so reloading mid-battle can't undo a loss. The game also remembers your battle speed, best record and the tips you've seen. |
 | **Phone layout** | Every screen fits one phone screen with no scrolling, down to 375×667. Each layout's flexible part (card list, hero stage, arena) takes the leftover height, sprites pick the largest whole-number scale that fits, and action buttons sit at the bottom within thumb reach. |
 | **Desktop** | With a mouse, the game sits in a centred phone-shaped frame, and hovering any item (worn, in the bag, in a rival's build or in a monster's drop table) shows a stat card. |
+| **Gear screen** | The hero stage is kept compact. Under it, DPS and EHP are shown big, and every stat (HP, Atk, Def, Crit, Crit damage, Haste, Resist, Evasion, Lifesteal, Regen, Thorns, Pierce) gets an icon cell. Unused stats are dimmed. Before a duel, only the 8 most relevant stats show. |
 | **Text** | Pixel fonts are kept for titles, names and battle pop-ups. Everything you read (stats, item lines, the log) uses Nunito at 12–15 px. |
 | **Help** | A short popup the first time each screen appears, and no permanent tutorial text. The ≡ menu has How to play (every stat and status explained), Show intro popups again, and Abandon run. |
 | **Readability** | Status chips have stack counts and draining timers. Damage numbers are colour-coded, and an attack-timer bar sits under each HP bar. After every fight a breakdown shows who dealt what, split into hits, crits, burn, poison, bleed and thorns. |

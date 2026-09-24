@@ -40,6 +40,7 @@ pg.click = async (sel) => {
   return realClick(sel);
 };
 const shot = async (n, full = !process.env.NOFULL) => { await pg.screenshot({ path: path.join(out, n + '.png'), fullPage: full }); console.log('shot', n); };
+await shot('00-title', false);
 await pg.click('#start');
 await pg.waitForTimeout(300);
 await shot('01-pick');

@@ -1,7 +1,7 @@
-# Publishes Gearfall to GitHub Pages on every push to the Gearfall branch.
+# Publishes ZereshkStory to GitHub Pages on every push to the game branch.
 # The game is static (plain ES modules), so the site is just index.html,
 # styles.css and src/, force-pushed to the gh-pages branch that Pages serves.
-name: Deploy Gearfall
+name: Deploy ZereshkStory
 
 on:
   push:
@@ -39,5 +39,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "Deploy Gearfall ${GITHUB_SHA::7}"
+          git commit -q -m "Deploy ZereshkStory ${GITHUB_SHA::7}"
           git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
