@@ -7,7 +7,7 @@
 
 import {
   ITEMS, MOBS, FAMILIES, RARITIES, rarityOdds, BAG_SIZE,
-  slotKind, scaleFor, STATUSES, dayInfo, dayOf, DAYS_IN_RUN,
+  slotKind, scaleFor, STATUSES, dayInfo, dayOf, DAYS_IN_RUN, STAT_HELP,
 } from '../data.js';
 import { statLines, perkLines, setCounts, activeSets, headline } from '../items.js';
 import { drawScene } from '../art/scenes.js';
@@ -75,7 +75,7 @@ const INTRO = {
     <p>Tap any item to swap it, or discard it to free up bag space. Two pieces from one monster family unlock a set bonus.</p>`],
   duelBlind: ['Duel!', `
     <p>You face another player's saved build. You won't see it until the fight starts.</p>
-    <p>Go in with your strongest all-round gear. Win and you loot from their build; lose and you'll know what beat you.</p>`],
+    <p>Go in with your strongest all-round gear. A win adds to your record; a loss costs a life. Either way you'll see their build afterwards.</p>`],
 };
 const intro = (key) => firstTime(key, ...INTRO[key]);
 
@@ -133,8 +133,8 @@ export function pickScreen(app, ctx) {
         <div class="name"><span>${m.name}</span><span class="chip tier-${m.tier}">${cap(m.tier)}</span></div>
         <div class="oddsline" data-odds="${id}"><span class="odds-chip o0">…</span></div>
         <div class="line">HP ${Math.round(m.hp * sc)} · Hit ${Math.round(m.min * sc)}–${Math.round(m.max * sc)} · ${m.interval}s${m.def ? ` · Def ${m.def}` : ''}</div>
-        <div class="traitrow"><span class="chip trait">${traitGlyph} ${m.trait}</span></div>
-        <div class="drops">${m.drops.map((d) => (ITEMS[d].relic ? `<span class="relic-drop" title="Relic">${iconImg(d, 1.2)}</span>` : iconImg(d, 1.2))).join('')}</div>
+        <div class="traitrow"><span class="chip trait" ${ap ? `data-tipstatus="${ap}"` : ''}>${traitGlyph} ${m.trait}</span></div>
+        <div class="drops">${m.drops.map((d) => `<span class="drop ${ITEMS[d].relic ? 'relic-drop' : ''}" data-tipdef="${d}">${iconImg(d, 1.2)}</span>`).join('')}</div>
         <div class="odds" aria-label="Common ${odds[0][1]}%, rare ${odds[1][1]}%, epic ${odds[2][1]}%">
           ${odds.map(([r, w]) => `<span class="${r[0]}" style="width:${w}%"></span>`).join('')}
         </div>
@@ -211,7 +211,7 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
 
   const setChips = Object.entries(counts).map(([fam, n]) => {
     const set = FAMILIES[fam].set;
-    return `<span class="set ${on.has(fam) ? 'on' : ''}">${set.name} ${Math.min(n, 2)}/2</span>`;
+    return `<span class="set ${on.has(fam) ? 'on' : ''}" data-tipset="${fam}">${set.name} ${Math.min(n, 2)}/2</span>`;
   }).join('');
 
   const bag = Array.from({ length: BAG_SIZE }, (_, i) => run.bag[i]
@@ -234,12 +234,13 @@ export function gearScreen(app, ctx, { mode = 'hub' } = {}) {
         <div class="col">${slotTile('weapon', 'Weapon')}${slotTile('trinket1', 'Trinket')}${slotTile('trinket2', 'Trinket')}</div>
       </div>
       <div class="statpanel panel">
-        <div class="big"><span class="k">DPS ${deltaBadge(prev?.dps, h.dps, (x) => x.toFixed(1))}</span><span class="v">${h.dps}</span></div>
-        <div class="big"><span class="k">EHP ${deltaBadge(prev?.ehp, h.ehp, Math.round)}</span><span class="v">${h.ehp}</span></div>
+        <div class="big"><span class="k" data-tipstat="DPS">DPS ${deltaBadge(prev?.dps, h.dps, (x) => x.toFixed(1))}</span><span class="v">${h.dps}</span></div>
+        <div class="big"><span class="k" data-tipstat="EHP">EHP ${deltaBadge(prev?.ehp, h.ehp, Math.round)}</span><span class="v">${h.ehp}</span></div>
         <div class="small">
-          <span>HP <b>${me.maxHp}</b></span><span>Atk <b>${me.atk}</b></span><span>Def <b>${me.def}</b></span>
-          <span>Crit <b>${fmtPct(me.crit)}</b></span><span>Haste <b>${fmtPct(me.haste)}</b></span><span>Res <b>${fmtPct(me.resist)}</b></span>
-          ${me.lifesteal ? `<span>Steal <b>${fmtPct(me.lifesteal)}</b></span>` : ''}${me.regen ? `<span>Regen <b>${me.regen}/s</b></span>` : ''}
+          ${[['HP', me.maxHp], ['Atk', me.atk], ['Def', me.def], ['Crit', fmtPct(me.crit)], ['Haste', fmtPct(me.haste)], ['Res', fmtPct(me.resist)],
+    me.lifesteal && ['Steal', fmtPct(me.lifesteal)], me.regen && ['Regen', `${me.regen}/s`], me.evasion && ['Evade', fmtPct(me.evasion)],
+    me.critDmg && ['Crit dmg', `+${fmtPct(me.critDmg)}`], me.thorns && ['Thorns', me.thorns], me.pen && ['Pierce', me.pen]]
+    .filter(Boolean).map(([k, v]) => `<span data-tipstat="${k}">${k} <b>${v}</b></span>`).join('')}
         </div>
       </div>
       <div class="bagpanel panel">
@@ -283,7 +284,7 @@ export function lootScreen(app, ctx) {
     if (after.ehp > before.ehp) tags.push('<span class="tag up">▲ EHP</span>');
     const cur = run.equip[run.slotFor(inst)];
     const sameFam = cur && ITEMS[cur.item].family === it.family;
-    if (it.family && counts[it.family] === 1 && !sameFam) tags.push(`<span class="tag set">Completes ${FAMILIES[it.family].set.name}</span>`);
+    if (it.family && counts[it.family] === 1 && !sameFam) tags.push(`<span class="tag set" data-tipset="${it.family}">Completes ${FAMILIES[it.family].set.name}</span>`);
     return `
     <div class="lootcard panel deal lc-${inst.rarity}" data-loot="${i}" style="animation-delay:${i * 0.1}s">
       ${tile(inst, { size: 2.5 })}
@@ -292,7 +293,7 @@ export function lootScreen(app, ctx) {
         <div class="meta">${it.relic ? '<span class="relic-tag">RELIC</span> ' : ''}${RARITIES[inst.rarity].name} ${slotName(inst)}${it.family ? ` · ${FAMILIES[it.family].name}` : ''}</div>
         ${perkLines(inst).length ? `<div class="perkline">${perkLines(inst).join(' ')}</div>` : ''}
         <div class="lines">${statLines(inst).slice(perkLines(inst).length).join(' · ')}</div>
-        <div class="cmp">DPS ${delta(before.dps, after.dps)} EHP ${delta(before.ehp, after.ehp)}</div>
+        <div class="cmp"><span>DPS ${delta(before.dps, after.dps)}</span><span>EHP ${delta(before.ehp, after.ehp)}</span></div>
         ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
       </div>
     </div>`;
@@ -300,7 +301,7 @@ export function lootScreen(app, ctx) {
   app.innerHTML = `
     ${hud(run)}
     <section class="screen">
-      <h2>${run.isDuel ? 'Duel spoils' : 'Pick your drop'}</h2>
+      <h2>Pick your drop</h2>
       <div class="loots">${cards}</div>
     </section>`;
   app.querySelectorAll('[data-loot]').forEach((el) => {
@@ -368,7 +369,7 @@ export function itemSheet(ctx, inst, where) {
   }
 
   const setLine = fam
-    ? `<div class="setline">${glyph('plus', 1)} <b>${fam.set.name}</b> 2-piece: ${fam.set.desc} · you wear ${counts[it.family] || 0}</div>`
+    ? `<div class="setline" data-tipset="${it.family}">${glyph('plus', 1)} <b>${fam.set.name}</b> 2-piece: ${fam.set.desc} · you wear ${counts[it.family] || 0}</div>`
     : '';
 
   // actions
@@ -501,24 +502,13 @@ export function helpSheet() {
     <h2>How to play</h2>
     <div class="help">
       <p><b>The run.</b> 5 days, 3 lives. Each day is two hunts, then a duel against another player's saved build. Each day's monsters are tougher than the last. Win the final duel for a Crown.</p>
-      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Tougher monsters drop rarer gear. Losing a hunt just means no drop.</p>
-      <p><b>Duels.</b> Hidden until the fight starts. Build for all-round strength. Win to loot from their gear; lose and you lose a life.</p>
+      <p><b>Hunts.</b> Pick a monster; the fight plays itself. Win to choose 1 of 3 drops from its table. Easy monsters are a safe item, mostly Common; Normal and Elite drop the Rare and Epic gear where perks and relics live. Losing a hunt just means no drop.</p>
+      <p><b>Duels.</b> Hidden until the fight starts. Build for all-round strength. A win adds to your record (no items); lose and you lose a life.</p>
       <p><b>Sets.</b> Two pieces from the same monster family unlock a bonus.</p>
       <p><b>Perks and relics.</b> Rare and epic drops can roll ✦ perks: niche effects to build around. Every elite also guards a <b>relic</b>, a rule-bending trinket (never common).</p>
       <p><b>Bag.</b> Six slots for spare pieces. Discard what you don't need.</p>
       <h3>Stats</h3>
-      ${stat('DPS', 'Average damage per second.')}
-      ${stat('EHP', 'Effective HP: health counting Def.')}
-      ${stat('Atk', 'Added to every weapon hit.')}
-      ${stat('Def', 'Removed from every physical hit (min 1). Magic ignores half. Status damage ignores all of it.')}
-      ${stat('Crit', 'Chance to hit for 150%.')}
-      ${stat('Haste', 'Faster attacks.')}
-      ${stat('Resist', 'Shortens harmful statuses on you, up to 50%.')}
-      ${stat('Lifesteal', 'Heals you for a share of damage dealt.')}
-      ${stat('Evasion', 'Chance to dodge a weapon hit entirely (max 40%).')}
-      ${stat('Crit dmg', 'Extra damage on crits, on top of 150%.')}
-      ${stat('Thorns', 'Damage dealt back to anyone who hits you.')}
-      ${stat('Pierce', 'Ignores that much of the target\'s Def.')}
+      ${Object.entries(STAT_HELP).map(([k, v]) => stat(k, v)).join('')}
       <h3>Statuses</h3>
       ${statuses}
     </div>

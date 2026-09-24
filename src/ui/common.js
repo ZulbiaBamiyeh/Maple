@@ -8,6 +8,7 @@ import { glyphGrid, STATUS_GLYPH } from '../art/glyphs.js';
 import { drawScene } from '../art/scenes.js';
 import { ITEMS, ROUNDS, DUEL_ROUNDS, SLOT_LABEL, STATUSES, DAYS_IN_RUN, dayOf } from '../data.js';
 import { tipSeen, markTip } from './store.js';
+import { registerTip } from './tooltip.js';
 
 const urls = new Map();
 function dataUrl(key, make) {
@@ -64,7 +65,7 @@ export function mountScenes(root) {
 
 export function tile(inst, { size = 2, attrs = '', label = '', extra = '' } = {}) {
   if (!inst) return `<div class="tile empty ${extra}" ${attrs}><span class="slotlabel">${label}</span></div>`;
-  return `<div class="tile r-${inst.rarity} ${extra}" ${attrs}>${iconImg(inst.item, size)}</div>`;
+  return `<div class="tile r-${inst.rarity} ${extra}" ${attrs} ${registerTip(inst)}>${iconImg(inst.item, size)}</div>`;
 }
 
 export const itemName = (inst) => ITEMS[inst.item].name;
@@ -128,7 +129,7 @@ export function toast(msg, kind = '') {
 export function statusChip(s) {
   const meta = STATUSES[s.id];
   const n = s.n ? `<span>${s.n}</span>` : '';
-  return `<span class="st" style="color:${meta.color};border-color:${meta.color}" title="${meta.name}: ${meta.desc}">${statusGlyph(s.id, 2)}${n}<i style="width:${Math.round(s.frac * 100)}%"></i></span>`;
+  return `<span class="st" style="color:${meta.color};border-color:${meta.color}" data-tipstatus="${s.id}">${statusGlyph(s.id, 2)}${n}<i style="width:${Math.round(s.frac * 100)}%"></i></span>`;
 }
 
 // "12.5 → 15.8 ▲"

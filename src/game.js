@@ -27,6 +27,10 @@ export function randomLook(rng) {
   };
 }
 
+// Hand-written rivals' gear rolls a few rounds behind the duel, more so later:
+// players only gear up from hunts, and a full rival kit at today's numbers is
+// too much.
+const ghostLag = (round) => 1 + dayOf(round);
 export const isDuel = (round) => DUEL_ROUNDS.includes(round);
 
 // Builds saved from earlier runs on this device, fought alongside the
@@ -112,7 +116,7 @@ export class Run {
       const gh = mine.length && r.chance(0.5) ? r.pick(mine) : r.pick(pool);
       this.ghost = {
         ...gh,
-        equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round) : null])),
+        equip: Object.fromEntries(SLOTS.map((s) => [s, gh.equip[s] ? hydrate(gh.equip[s], this.round, ghostLag(this.round)) : null])),
       };
       this.offers = null;
     } else {
@@ -166,21 +170,20 @@ export class Run {
     const { result, mobId, duel } = this.lastFight;
     const won = result.winner === 0;
     const draw = result.winner === -1;
-    const out = { won, draw, lifeLost: false };
+    const out = { won, draw, duel, lifeLost: false };
     const label = duel ? this.ghost.name : MOBS[mobId].name;
     this.tally(result);
     if (won) {
       this.wins++;
-      const lr = new Rng(hash(this.seed, this.round, 'loot'));
+      // Duels pay out a win, never items: gear only comes from hunts.
       if (duel) {
-        const pool = [...new Set(Object.values(this.ghost.equip).filter(Boolean).map((i) => i.item))];
-        this.loot = rollLoot(pool, 'normal', this.round, lr, true, this.day);
+        this.loot = null;
+        if (this.round === ROUNDS) this.crown = true;
       } else {
+        const lr = new Rng(hash(this.seed, this.round, 'loot'));
         const m = MOBS[mobId];
         this.loot = rollLoot(m.drops, m.tier, this.round, lr, false, this.day);
       }
-      // The last duel pays out a Crown, not a drop.
-      if (this.round === ROUNDS) { this.crown = true; this.loot = null; }
     } else if (!draw) {
       // Hunts are for loot: losing one just means no drop. Only duels cost a life.
       this.losses++;

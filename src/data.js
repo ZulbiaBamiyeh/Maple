@@ -33,6 +33,24 @@ export const STATUSES = {
   hex:    { name: 'Hex',    harmful: true,  color: '#c07cff', glyph: 'eye',    desc: 'Healing received is halved.' },
 };
 
+// What each stat means, for the help sheet and hover cards.
+export const STAT_HELP = {
+  DPS: 'Average damage per second.',
+  EHP: 'Effective HP: health counting Def.',
+  HP: 'Health. Reach 0 and you fall.',
+  Atk: 'Added to every weapon hit.',
+  Def: 'Removed from every physical hit (min 1). Magic ignores half. Status damage ignores all of it.',
+  Crit: 'Chance to hit for 150%.',
+  Haste: 'Faster attacks.',
+  Res: 'Resist: shortens harmful statuses on you, up to 50%.',
+  Steal: 'Lifesteal: heals you for a share of damage dealt.',
+  Regen: 'Heals this much every second.',
+  Evade: 'Evasion: chance to dodge a weapon hit entirely (max 40%).',
+  'Crit dmg': 'Extra damage on crits, on top of 150%.',
+  Thorns: 'Damage dealt back to anyone who hits you.',
+  Pierce: 'Ignores that much of the target\'s Def.',
+};
+
 // ---------------------------------------------------------------- weapons
 
 export const WEAPON_TYPES = {
@@ -475,30 +493,30 @@ export const dayInfo = (round) => DAYS[Math.min(DAYS.length, dayOf(round)) - 1];
 export const MOB_POWER = {
   stone_golem: 0.68,
   cinder_imp: 1.09,
-  snapjaw_crab: 1.85,
-  sting_jelly: 1.82,
-  reef_eel: 1.28,
-  pearl_oyster: 1.27,
-  king_snapjaw: 0.93,
-  siren: 1.23,
-  cogling: 1.96,
-  rust_mite: 1.9,
-  arc_sprite: 1.53,
-  clockwork_knight: 1.27,
-  rust_titan: 1.1,
-  tesla_sentinel: 1.29,
-  grave_bat: 2.12,
-  bone_rattler: 1.97,
-  hex_crow: 1.96,
-  shade_stalker: 1.44,
-  bone_knight: 1.14,
-  moor_witch: 1.68,
-  emberling: 2.62,
-  gale_harpy: 2.1,
-  crystal_tortoise: 1.69,
-  thunder_roc: 1.66,
-  elder_drake: 1.22,
-  prism_colossus: 1.21,
+  snapjaw_crab: 1.32,
+  sting_jelly: 1.15,
+  reef_eel: 1.22,
+  pearl_oyster: 1.21,
+  king_snapjaw: 0.89,
+  siren: 1.21,
+  cogling: 0.88,
+  rust_mite: 0.95,
+  arc_sprite: 1.36,
+  clockwork_knight: 1.11,
+  rust_titan: 0.94,
+  tesla_sentinel: 1.08,
+  grave_bat: 1.15,
+  bone_rattler: 1.01,
+  hex_crow: 1.69,
+  shade_stalker: 1.27,
+  bone_knight: 0.97,
+  moor_witch: 1.42,
+  emberling: 1.26,
+  gale_harpy: 1.08,
+  crystal_tortoise: 1.32,
+  thunder_roc: 1.62,
+  elder_drake: 1.17,
+  prism_colossus: 0.94,
 };
 DAYS.forEach((d, i) => {
   for (const ids of Object.values(d.tiers)) for (const id of ids) MOBS[id].day = i + 1;
@@ -526,9 +544,10 @@ export const RARITY_ODDS = {
   elite: [['common', 0], ['rare', 55], ['epic', 45]],
 };
 
-// Later days shift the odds away from common: 20% fewer commons per day.
+// Later days shift Normal and Elite odds away from common: 20% fewer commons
+// per day. Easy stays mostly common every day: it's the safe pick, not the rich one.
 export function rarityOdds(tier, day = 1) {
-  const k = Math.pow(0.8, day - 1);
+  const k = tier === 'easy' ? 1 : Math.pow(0.8, day - 1);
   const [c, r, e] = RARITY_ODDS[tier];
   const common = c[1] * k;
   const spare = c[1] - common;

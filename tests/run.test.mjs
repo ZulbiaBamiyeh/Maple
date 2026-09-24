@@ -146,3 +146,20 @@ test('perks come from rarity: none on commons, some on rares, always on epics', 
   assert.ok(share > 0.3 && share < 0.5, `rare perk share ${share}`);
   assert.ok(roll('epic').every((n) => n >= 1));
 });
+
+test('a duel win adds to the record but drops no items', () => {
+  let duelWins = 0;
+  for (let seed = 1; seed <= 30 && duelWins < 3; seed++) {
+    const run = new Run(seed);
+    while (!run.over) {
+      const duel = run.isDuel;
+      const wins = run.wins;
+      run.fight(duel ? undefined : run.offers[0]);
+      const out = run.resolve();
+      if (duel && out.won) { duelWins++; assert.equal(run.loot, null); assert.equal(run.wins, wins + 1); }
+      if (run.loot) run.takeLoot(run.loot[0], 'equip');
+      if (!run.over) run.next();
+    }
+  }
+  assert.ok(duelWins >= 3);
+});

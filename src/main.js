@@ -6,10 +6,12 @@ import { Rng } from './rng.js';
 import { showBattle } from './ui/battle.js';
 import { titleScreen, pickScreen, gearScreen, lootScreen, endScreen, menuSheet, buildSheet } from './ui/screens.js';
 import { toast, closeSheet } from './ui/common.js';
+import { installTooltips } from './ui/tooltip.js';
 import { load, save } from './ui/store.js';
 import { rollInstance } from './items.js';
 
 const app = document.getElementById('app');
+installTooltips();
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
 
@@ -137,6 +139,7 @@ function afterBattle() {
   const run = ctx.run;
   const { out } = ctx.opts;
   if (out.lifeLost) toast('−1 life', 'bad');
+  if (out.won && out.duel && !run.over) toast(`Duel won · record ${run.record}`, 'good');
   if (out.draw) toast('Draw — no life lost');
   if (run.over) return ctx.go('end');
   if (run.loot) return ctx.go('loot');

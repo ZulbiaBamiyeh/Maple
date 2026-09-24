@@ -16,7 +16,12 @@ const server = http.createServer((req, res) => {
 const out = process.argv[2] || '.';
 const seed = process.argv[3] || '42';
 const browser = await chromium.launch();
-const pg = await (await browser.newContext({ viewport: { width: +(process.env.VW || 390), height: +(process.env.VH || 844) } })).newPage();
+// Phones by default (touch, no hover); DESKTOP=1 for a mouse and a big window.
+const desk = !!process.env.DESKTOP;
+const pg = await (await browser.newContext({
+  viewport: { width: +(process.env.VW || (desk ? 1440 : 390)), height: +(process.env.VH || (desk ? 900 : 844)) },
+  isMobile: !desk, hasTouch: !desk,
+})).newPage();
 pg.on('pageerror', (e) => console.log('[pageerror]', e.message));
 pg.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('ERR_CERT')) console.log('[console]', m.text()); });
 await pg.goto(`http://localhost:${server.address().port}/index.html?seed=${seed}`);
@@ -38,10 +43,12 @@ const shot = async (n, full = !process.env.NOFULL) => { await pg.screenshot({ pa
 await pg.click('#start');
 await pg.waitForTimeout(300);
 await shot('01-pick');
+if (desk) { await pg.hover('[data-tipdef]'); await pg.waitForTimeout(200); await shot('01b-hover', false); }
 await pg.click('[data-mob]');
 await pg.waitForTimeout(2600);
 await shot('02-battle', false);
-await pg.click('[data-speed="skip"]');
+if (desk && await pg.$('[data-tipstatus]')) { await pg.hover('.chips [data-tipstatus]').catch(() => {}); await pg.waitForTimeout(150); await shot('02b-hover-status', false); }
+await realClick('[data-speed="skip"]', { timeout: 1500 }).catch(() => {});
 await pg.waitForTimeout(600);
 await shot('03-battle-end');
 await pg.click('#cont');
@@ -54,6 +61,13 @@ if (await pg.$('[data-loot]')) {
   await pg.click('[data-act="equip"]');
   await pg.waitForTimeout(400);
   await shot('06-gear');
+  if (desk) {
+    await pg.click('body');
+    await pg.hover('.paperdoll [data-tip]');
+    await pg.waitForTimeout(200);
+    await shot('06b-hover', false);
+    if (await pg.$('[data-tipset]')) { await pg.hover('[data-tipset]'); await pg.waitForTimeout(200); await shot('06c-hover-set', false); }
+  }
 }
 // play on greedily: always hunt the easy mob, equip loot, until a duel
 const seen = new Set();
