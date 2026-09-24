@@ -34,7 +34,6 @@ const MOB_COLOR = { wisp: '#9fe0ff', imp: '#f58a3a', siren: '#74e0d0', sprite: '
 const CLOSE = { dagger: 4, sword: 9, spear: 18, mace: 8, axe: 9, fist: 3, hop: 2, charge: 0, slam: 6, lunge: 4 };
 const RANGED = new Set(['staff', 'cast']);
 
-const SOURCE_COLOR = { Hits: '#f4f1ff', Crits: '#f58a3a', burn: '#f58a3a', poison: '#6cc24a', bleed: '#d9434f', thorns: '#aeb4c8', shock: '#ffe066' };
 
 const glyphCanvas = new Map();
 function glyphC(status) {
@@ -80,7 +79,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
   const S = cw >= 300 ? 3 : 2;
   const W = Math.floor(cw / S);
   // Fill the height left after the HUD, the log/result area and the buttons.
-  const free = app.clientHeight - app.querySelector('.hud').offsetHeight - 128 - 56 - 24;
+  const free = app.clientHeight - app.querySelector('.hud').offsetHeight - 150 - 56 - 24; // leaves room for the post-fight summary
   const H = Math.max(90, Math.min(150, Math.floor(free / S)));
   const groundY = H - 16;
   canvas.width = W;
@@ -618,6 +617,7 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
     const why = document.createElement('div');
     why.className = 'why panel';
     why.innerHTML = whyHtml(result, names);
+    wireWhy(why);
     logEl.replaceWith(why);
     app.querySelector('#acts').innerHTML = `${duel && showFoe ? '<button class="btn" id="peek2">Their build</button>' : ''}<button class="btn go" id="cont">Continue ▸</button>`;
     app.querySelector('#peek2')?.addEventListener('click', () => showFoe(null));
@@ -688,23 +688,95 @@ export function showBattle(app, run, fight, onDone, { before = null, out = null,
 const easeOut = (x) => 1 - (1 - x) * (1 - x);
 
 // Damage by source for both sides, as bars.
-function whyHtml(result, names) {
-  const dealt = [{}, {}];
-  const add = (side, k, v) => { dealt[side][k] = (dealt[side][k] || 0) + v; };
-  const heals = [0, 0];
+// After the fight: where the damage came from, as a donut you can flip between
+// what you dealt and what you took. Colours are fixed per damage type and in a
+// fixed order (checked for colour-blind separation between neighbours); the
+// legend always names each slice, so colour is never the only cue.
+const DMG_TYPES = [
+  ['hits', 'Hits', '#d9d4ee'], ['poison', 'Poison', '#6cc24a'], ['crits', 'Crits', '#f28bb0'], ['shock', 'Shock', '#ffe066'],
+  ['overclock', 'Overclock', '#b77cf0'], ['burn', 'Burn', '#f26b38'], ['thorns', 'Thorns', '#8b92ac'], ['bleed', 'Bleed', '#e04858'],
+];
+
+function damageBreakdown(result) {
+  // out[side] = { dealt: {type: n}, taken: {type: n} }
+  const out = [0, 1].map(() => ({ dealt: {}, taken: {}, healed: 0 }));
+  const add = (bag, k, v) => { if (v > 0) bag[k] = (bag[k] || 0) + v; };
   for (const e of result.events) {
-    if (e.type === 'hit') add(e.src, e.crit ? 'Crits' : 'Hits', e.dmg);
-    else if (e.type === 'dot' && e.status !== 'overclock') add(1 - e.dst, e.status, e.dmg);
-    else if (e.type === 'heal') heals[e.dst] += e.amt;
+    if (e.type === 'hit') {
+      const shock = Math.min(e.shock || 0, e.dmg);
+      const k = e.crit ? 'crits' : 'hits';
+      add(out[e.src].dealt, k, e.dmg - shock); add(out[e.src].dealt, 'shock', shock);
+      add(out[e.dst].taken, k, e.dmg - shock); add(out[e.dst].taken, 'shock', shock);
+    } else if (e.type === 'dot') {
+      const k = DMG_TYPES.some(([id]) => id === e.status) ? e.status : 'thorns';
+      add(out[e.dst].taken, k, e.dmg);
+      if (k !== 'overclock') add(out[1 - e.dst].dealt, k, e.dmg); // self-inflicted isn't "dealt"
+    } else if (e.type === 'heal') out[e.dst].healed += e.amt;
   }
-  const max = Math.max(1, ...dealt.flatMap((d) => Object.values(d)));
-  return [0, 1].map((i) => {
-    const total = Object.values(dealt[i]).reduce((s, v) => s + v, 0);
-    const rows = Object.entries(dealt[i]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `
-      <div class="row"><span>${k === 'Hits' || k === 'Crits' ? k : STATUSES[k]?.name || 'Thorns'}</span>
-      <div class="bar2"><span style="width:${(v / max) * 100}%;background:${SOURCE_COLOR[k] || '#aeb4c8'}"></span></div>
-      <span class="n">${v}</span></div>`).join('');
-    const heal = heals[i] ? ` · healed ${heals[i]}` : '';
-    return `<div class="whohead"><b>${names[i]}</b> <span class="sub">dealt ${total}${heal}</span></div>${rows}`;
+  return out;
+}
+
+function donut(bag) {
+  const parts = DMG_TYPES.filter(([k]) => bag[k] > 0).map(([k, name, color]) => ({ k, name, color, v: bag[k] }));
+  const total = parts.reduce((s, p) => s + p.v, 0);
+  const R = 40, W = 13, C = 48;
+  let a = -Math.PI / 2;
+  const gap = parts.length > 1 ? 0.045 : 0; // ~2px of surface between slices
+  const arcs = parts.map((p) => {
+    const sweep = (p.v / total) * Math.PI * 2;
+    const a0 = a + gap / 2, a1 = a + sweep - gap / 2;
+    a += sweep;
+    if (parts.length === 1) return `<circle class="sl" data-k="${p.k}" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${p.color}" stroke-width="${W}"/>`;
+    const pt = (ang) => `${(C + Math.cos(ang) * R).toFixed(2)} ${(C + Math.sin(ang) * R).toFixed(2)}`;
+    return `<path class="sl" data-k="${p.k}" d="M ${pt(a0)} A ${R} ${R} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${pt(a1)}" fill="none" stroke="${p.color}" stroke-width="${W}"/>`;
   }).join('');
+  const pct = (v) => `${Math.round((v / total) * 100)}%`;
+  const legend = parts.map((p) => `
+    <li data-k="${p.k}" data-v="${p.v}" data-p="${pct(p.v)}" data-n="${p.name}"><i style="background:${p.color}"></i><span>${p.name}</span><b>${p.v}</b><em>${pct(p.v)}</em></li>`).join('');
+  return total
+    ? `<div class="donut"><svg viewBox="0 0 96 96" role="img" aria-label="Damage by type">${arcs}</svg>
+        <div class="mid"><b>${total}</b><span>total</span></div></div>
+       <ul class="dleg ${parts.length > 4 ? 'two' : ''}">${legend}</ul>`
+    : '<div class="dnone">No damage.</div>';
+}
+
+function whyHtml(result, names) {
+  const b = damageBreakdown(result)[0];
+  const sum = (bag) => Object.values(bag).reduce((s, v) => s + v, 0);
+  return `
+    <div class="why-top">
+      <div class="seg" role="tablist">
+        <button class="on" data-view="dealt" role="tab">Dealt <b>${sum(b.dealt)}</b></button>
+        <button data-view="taken" role="tab">Taken <b>${sum(b.taken)}</b></button>
+      </div>
+      ${b.healed ? `<span class="healed">+${b.healed} healed</span>` : ''}
+    </div>
+    <div class="why-body" data-view="dealt">${donut(b.dealt)}</div>
+    <div class="why-body" data-view="taken" hidden>${donut(b.taken)}</div>`;
+}
+
+// Toggle, plus tap/hover on a slice or legend row to read it out in the middle.
+function wireWhy(el) {
+  el.querySelectorAll('.seg button').forEach((btn) => {
+    btn.onclick = () => {
+      el.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === btn));
+      el.querySelectorAll('.why-body').forEach((body) => { body.hidden = body.dataset.view !== btn.dataset.view; });
+    };
+  });
+  el.querySelectorAll('.why-body').forEach((body) => {
+    const mid = body.querySelector('.mid');
+    if (!mid) return;
+    const rest = mid.innerHTML;
+    const focus = (k) => {
+      body.classList.toggle('focus', !!k);
+      body.querySelectorAll('[data-k]').forEach((n) => n.classList.toggle('hl', n.dataset.k === k));
+      const li = k && body.querySelector(`li[data-k="${k}"]`);
+      mid.innerHTML = li ? `<b>${li.dataset.v}</b><span>${li.dataset.n} · ${li.dataset.p}</span>` : rest;
+    };
+    body.querySelectorAll('[data-k]').forEach((n) => {
+      n.addEventListener('mouseenter', () => focus(n.dataset.k));
+      n.addEventListener('mouseleave', () => focus(null));
+      n.addEventListener('click', () => focus(body.classList.contains('focus') && n.classList.contains('hl') ? null : n.dataset.k));
+    });
+  });
 }

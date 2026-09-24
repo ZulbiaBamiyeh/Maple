@@ -52,6 +52,7 @@ if (desk && await pg.$('[data-tipstatus]')) { await pg.hover('.chips [data-tipst
 await realClick('[data-speed="skip"]', { timeout: 1500 }).catch(() => {});
 await pg.waitForTimeout(600);
 await shot('03-battle-end');
+if (await pg.$('.seg [data-view="taken"]')) { await realClick('.seg [data-view="taken"]'); await pg.waitForTimeout(100); await shot('03b-taken', false); await realClick('.seg [data-view="dealt"]'); }
 await pg.click('#cont');
 await pg.waitForTimeout(400);
 await shot('04-after');
